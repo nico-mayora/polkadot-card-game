@@ -1,0 +1,27 @@
+# ─── Dependencies ────────────────────────────────────────────────
+node_modules/
+
+# ─── Environment / secrets ───────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Frontend build ──────────────────────────────────────────────
+web/dist/
+web/.vite/
+
+# ─── Contract build artifacts ────────────────────────────────────
+contracts/artifacts/
+contracts/cache/
+contracts/types/
+contracts/coverage/
+
+# ─── Auto-generated deployment config (written by deploy script) ─
+web/src/config/deployments.ts
+
+# ─── OS / editor ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

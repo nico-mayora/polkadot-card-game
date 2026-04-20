@@ -1,0 +1,24 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:local": "npm run compile && node scripts/deploy.js",
+    "deploy:paseo": "npm run compile && RPC_URL=https://testnet-passet-hub-eth-rpc.polkadot.io NETWORK=paseo node scripts/deploy.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "ethers": "^6.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^7.0.0",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.4",
+    "@types/node": "^22.19.17",
+    "hardhat": "^3.3.0",
+    "typescript": "~5.8.0"
+  }
+}
