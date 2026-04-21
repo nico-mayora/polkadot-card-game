@@ -70,35 +70,53 @@ function parseHandFromReceipt(receipt, account) {
 // ─── Card Component ──────────────────────────────────────────────────
 function Card({ cardId, selected, onClick, small, played, count, dimmed }) {
   const c = CARD_DEFS[cardId];
-  const isLight = c.color === "#eaeaca" || c.color === "#dac060" || c.color === "#d4c74a";
+  const w = small ? 90 : 118, h = small ? 132 : 172;
   return (
     <div onClick={onClick} style={{
-      width: small ? 90 : 120, minHeight: small ? 130 : 170,
-      background: `linear-gradient(145deg, ${c.color}, ${c.color}dd, #0a0a14)`,
-      border: selected ? "2px solid #ffd700" : "2px solid #333",
-      borderRadius: 10, padding: "10px 8px", cursor: onClick ? "pointer" : "default",
+      width: w, minHeight: h,
+      background: `linear-gradient(160deg, ${c.color}ee 0%, ${c.color}99 60%, #0a0604 100%)`,
+      border: selected ? "2px solid #c9a84c" : dimmed ? "2px solid #5a2a2a" : "2px solid #6b4c1e",
+      borderRadius: 8,
+      padding: "8px 7px 7px",
+      cursor: onClick ? "pointer" : "default",
       display: "flex", flexDirection: "column", justifyContent: "space-between",
-      position: "relative", transition: "all 0.2s",
-      transform: selected ? "translateY(-6px)" : played ? "scale(0.9)" : "none",
-      opacity: dimmed ? 0.35 : played ? 0.5 : 1,
-      boxShadow: selected ? "0 0 20px #ffd70066" : "0 2px 8px #0005",
-      fontFamily: "'Courier New', monospace",
+      position: "relative", transition: "transform 0.15s, box-shadow 0.15s",
+      transform: selected ? "translateY(-8px) rotate(-1deg)" : played ? "scale(0.88)" : "none",
+      opacity: dimmed ? 0.4 : played ? 0.55 : 1,
+      boxShadow: selected
+        ? "0 8px 24px rgba(201,168,76,0.5), 0 2px 6px rgba(0,0,0,0.6)"
+        : "2px 4px 10px rgba(0,0,0,0.7)",
+      fontFamily: "'Crimson Pro', Georgia, serif",
     }}>
-      {count > 1 && <div style={{
-        position:"absolute", top:-8, right:-8, background:"#ffd700", color:"#000",
-        borderRadius:"50%", width:22, height:22, display:"flex", alignItems:"center",
-        justifyContent:"center", fontSize:12, fontWeight:700
-      }}>{count}</div>}
-      <div style={{ fontSize: small ? 10 : 12, fontWeight: 700, color: isLight ? "#111" : "#fff",
-        lineHeight: 1.2, letterSpacing: 0.5 }}>{c.name}</div>
-      <div style={{ fontSize: small ? 28 : 36, textAlign: "center", margin: "4px 0",
-        filter: "drop-shadow(0 0 6px #0008)" }}>
+      {count > 1 && (
+        <div style={{
+          position: "absolute", top: -8, right: -8,
+          background: "linear-gradient(135deg, #c9a84c, #8b6914)",
+          color: "#1a0e04", borderRadius: "50%",
+          width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 700, boxShadow: "0 1px 4px rgba(0,0,0,0.5)",
+          fontFamily: "'Cinzel', serif",
+        }}>{count}</div>
+      )}
+      <div style={{
+        fontSize: small ? 9.5 : 11, fontWeight: 600, color: "#e8d5b7",
+        lineHeight: 1.2, letterSpacing: 0.3, textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+        fontFamily: "'Cinzel', serif",
+      }}>{c.name}</div>
+      <div style={{
+        fontSize: small ? 30 : 38, textAlign: "center", margin: "2px 0",
+        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.7))",
+      }}>
         {["🔥","🪨","🗡️","🛡️","🐲","❄️","⚡","🌿","💨","🔮",
           "🌀","☀️","🌑","🌊","🦅","🐢","🌩️","✨","💀","👼"][cardId]}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: small ? 11 : 13, fontWeight: 700 }}>
-        <span style={{ color: "#ff6b6b" }}>⚔{c.atk}</span>
-        <span style={{ color: "#6bafff" }}>🛡{c.def}</span>
+      <div style={{
+        display: "flex", justifyContent: "space-between",
+        fontSize: small ? 11 : 13, fontWeight: 600,
+        background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 5px",
+      }}>
+        <span style={{ color: "#ff8a6b" }}>⚔ {c.atk}</span>
+        <span style={{ color: "#8ab8ff" }}>🛡 {c.def}</span>
       </div>
     </div>
   );
@@ -498,28 +516,111 @@ export default function ChainCardsGame() {
   const totalCards = collection.reduce((a, b) => a + b, 0);
   const owned = collection.filter((c) => c > 0).length;
 
+  const G = {
+    gold:      "#c9a84c",
+    goldDim:   "#8b6914",
+    goldDeep:  "#5a3a08",
+    parchment: "#e8d5b7",
+    parchDim:  "#a09070",
+    woodDark:  "#1c0e04",
+    woodMid:   "#2e1a08",
+    woodLight: "#4a2e14",
+    felt:      "#0d1f0d",
+    feltLight: "#162a16",
+    red:       "#c0392b",
+    redDim:    "#7a2a2a",
+  };
+
   const sty = {
-    page: { minHeight: "100vh", background: "linear-gradient(170deg, #080810 0%, #0d1117 40%, #0a0e1a 100%)", color: "#e0dcd0", fontFamily: "'Georgia', serif" },
-    header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: "1px solid #222", background: "#0004" },
-    title: { fontSize: 22, fontWeight: 700, letterSpacing: 2, color: "#ffd700", textTransform: "uppercase" },
-    stats: { display: "flex", gap: 20, fontSize: 14, color: "#aaa" },
-    nav: { display: "flex", gap: 6, padding: "12px 24px", flexWrap: "wrap" },
+    page: {
+      minHeight: "100vh",
+      color: G.parchment,
+      fontFamily: "'Crimson Pro', Georgia, serif",
+    },
+    header: {
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "14px 28px",
+      borderBottom: `2px solid ${G.goldDim}`,
+      background: `linear-gradient(180deg, #0d0602 0%, ${G.woodDark} 100%)`,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.7)",
+    },
+    title: {
+      fontSize: 24, fontWeight: 700, letterSpacing: 4,
+      color: G.gold, textTransform: "uppercase",
+      fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+      textShadow: `0 0 20px ${G.goldDim}88`,
+    },
+    stats: { display: "flex", gap: 24, fontSize: 15, color: G.parchDim, fontStyle: "italic" },
+    nav: {
+      display: "flex", gap: 6, padding: "10px 24px", flexWrap: "wrap",
+      borderBottom: `1px solid ${G.woodLight}`,
+      background: `linear-gradient(180deg, ${G.woodDark} 0%, ${G.woodMid} 100%)`,
+    },
     navBtn: (active) => ({
-      padding: "8px 18px", borderRadius: 6, border: active ? "1px solid #ffd700" : "1px solid #333",
-      background: active ? "#ffd70018" : "#111", color: active ? "#ffd700" : "#aaa",
-      cursor: "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.2s"
+      padding: "7px 18px", borderRadius: 3,
+      border: active ? `1px solid ${G.gold}` : `1px solid ${G.woodLight}`,
+      background: active
+        ? `linear-gradient(180deg, ${G.goldDeep} 0%, #3a1a04 100%)`
+        : "transparent",
+      color: active ? G.gold : G.parchDim,
+      cursor: "pointer", fontSize: 12, fontWeight: 600,
+      letterSpacing: 1, textTransform: "uppercase",
+      fontFamily: "'Cinzel', serif",
+      transition: "all 0.15s",
     }),
-    section: { padding: "16px 24px" },
-    grid: { display: "flex", flexWrap: "wrap", gap: 10 },
+    section: { padding: "20px 28px" },
+    panel: {
+      background: `radial-gradient(ellipse at 50% 0%, ${G.feltLight} 0%, ${G.felt} 60%, #080e08 100%)`,
+      border: `3px solid ${G.woodLight}`,
+      borderRadius: 10,
+      padding: "20px",
+      margin: "4px 0 16px",
+      boxShadow: `inset 0 2px 12px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.5)`,
+    },
+    grid: { display: "flex", flexWrap: "wrap", gap: 12 },
     btn: (disabled) => ({
-      padding: "10px 24px", borderRadius: 8, border: "none", fontWeight: 700, fontSize: 14,
-      cursor: disabled ? "not-allowed" : "pointer", transition: "all 0.2s",
-      background: disabled ? "#333" : "linear-gradient(135deg, #ffd700, #e8a800)",
-      color: disabled ? "#666" : "#000", opacity: disabled ? 0.5 : 1
+      padding: "9px 26px", borderRadius: 4,
+      border: disabled ? `1px solid ${G.woodLight}` : `1px solid ${G.gold}`,
+      fontWeight: 700, fontSize: 13,
+      cursor: disabled ? "not-allowed" : "pointer",
+      background: disabled
+        ? G.woodMid
+        : `linear-gradient(180deg, #7a5a1e 0%, ${G.goldDeep} 50%, #6a4a18 100%)`,
+      color: disabled ? G.woodLight : G.gold,
+      opacity: disabled ? 0.55 : 1,
+      letterSpacing: 1, textTransform: "uppercase",
+      fontFamily: "'Cinzel', serif",
+      boxShadow: disabled ? "none" : `0 2px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,100,0.15)`,
+      transition: "all 0.15s",
     }),
-    btnDanger: { padding: "8px 18px", borderRadius: 8, border: "1px solid #ff4444", background: "transparent", color: "#ff4444", cursor: "pointer", fontSize: 13 },
-    log: { maxHeight: 160, overflowY: "auto", background: "#0a0a14", border: "1px solid #222", borderRadius: 8, padding: 10, fontSize: 12, color: "#8a8a7a", lineHeight: 1.6 },
-    pending: { color: "#888", fontSize: 14, padding: "20px 0", textAlign: "center" },
+    btnDanger: {
+      padding: "7px 18px", borderRadius: 4,
+      border: `1px solid ${G.red}`,
+      background: "transparent", color: G.red,
+      cursor: "pointer", fontSize: 12,
+      letterSpacing: 1, textTransform: "uppercase",
+      fontFamily: "'Cinzel', serif",
+    },
+    log: {
+      maxHeight: 160, overflowY: "auto",
+      background: "rgba(0,0,0,0.5)",
+      border: `1px solid ${G.woodLight}`,
+      borderRadius: 4, padding: "10px 12px",
+      fontSize: 14, color: G.parchDim, lineHeight: 1.7,
+      fontFamily: "'Crimson Pro', serif",
+    },
+    pending: {
+      color: G.parchDim, fontSize: 16, padding: "28px 0",
+      textAlign: "center", fontStyle: "italic",
+      fontFamily: "'Crimson Pro', serif",
+    },
+    h2: { color: G.gold, margin: "0 0 14px", fontFamily: "'Cinzel', serif", letterSpacing: 2, fontSize: 18 },
+    label: { color: G.parchDim, fontSize: 13 },
+    input: {
+      marginLeft: 6, background: `${G.woodDark}cc`, color: G.parchment,
+      border: `1px solid ${G.woodLight}`, borderRadius: 3, padding: "4px 8px",
+      fontFamily: "'Crimson Pro', serif", fontSize: 14,
+    },
   };
 
   const PENDING_PHASES = ["committing", "dealing", "resolving", "forfeiting"];
@@ -544,18 +645,19 @@ export default function ChainCardsGame() {
       {/* Active game banner */}
       {battle && screen !== "battle" && !["won","lost"].includes(battle.phase) && (
         <div style={{
-          background: "linear-gradient(90deg, #1a0a00, #2a1400, #1a0a00)",
-          borderBottom: "1px solid #ff6a00", padding: "8px 24px",
+          background: `linear-gradient(90deg, ${G.woodDark}, #3a1a00, ${G.woodDark})`,
+          borderBottom: `1px solid ${G.goldDim}`, padding: "8px 28px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <span style={{ color: "#ff9a00", fontSize: 13 }}>
-            ⚔️ Game in progress — {LEVELS[battle.level].name} | Turn {battle.turn + 1} | HP {battle.playerHp}/{PLAYER_MAX_HP}
+          <span style={{ color: G.gold, fontSize: 14, fontStyle: "italic", fontFamily: "'Crimson Pro', serif" }}>
+            ⚔️ Battle in progress — {LEVELS[battle.level].name} · Turn {battle.turn + 1} · HP {battle.playerHp}/{PLAYER_MAX_HP}
           </span>
-          <button
-            onClick={() => setScreen("battle")}
-            style={{ padding: "5px 16px", borderRadius: 6, border: "1px solid #ff6a00",
-              background: "#ff6a0022", color: "#ff9a00", cursor: "pointer", fontSize: 13, fontWeight: 700 }}
-          >
+          <button onClick={() => setScreen("battle")} style={{
+            padding: "4px 14px", borderRadius: 3,
+            border: `1px solid ${G.goldDim}`, background: G.goldDeep,
+            color: G.gold, cursor: "pointer", fontSize: 11,
+            letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Cinzel', serif",
+          }}>
             Return to Battle
           </button>
         </div>
@@ -572,10 +674,10 @@ export default function ChainCardsGame() {
           </button>
         )}
         {battle && !["won","lost"].includes(battle.phase) && (
-          <button
-            onClick={() => setScreen("battle")}
-            style={{ ...sty.navBtn(screen === "battle"), borderColor: "#ff6a00", color: screen === "battle" ? "#ff9a00" : "#cc5500" }}
-          >
+          <button onClick={() => setScreen("battle")} style={{
+            ...sty.navBtn(screen === "battle"),
+            borderColor: G.goldDim, color: screen === "battle" ? G.gold : "#c97a30",
+          }}>
             ⚔️ Battle
           </button>
         )}
@@ -587,17 +689,21 @@ export default function ChainCardsGame() {
       {/* Home */}
       {screen === "home" && (
         <div style={sty.section}>
-          <h2 style={{ color: "#ffd700", margin: "0 0 12px" }}>Welcome to Chain Cards</h2>
-          <p style={{ color: "#888", lineHeight: 1.7, maxWidth: 640 }}>
+          <h2 style={sty.h2}>Welcome to Chain Cards</h2>
+          <p style={{ color: G.parchDim, lineHeight: 1.8, maxWidth: 640, fontSize: 16 }}>
             Collect 20 unique cards, build decks, and battle AI enemies across 3 levels.
             Card ownership and deck shuffling are handled on-chain — no cheating possible.
             Buy booster packs with tokens, trade cards with other players, and earn rewards for victories.
           </p>
-          {!starterClaimed && <p style={{ color: "#ffd700", marginTop: 16 }}>👆 Claim your starter pack to begin!</p>}
+          {!starterClaimed && (
+            <p style={{ color: G.gold, marginTop: 16, fontStyle: "italic", fontSize: 15 }}>
+              👆 Claim your starter pack to begin your adventure!
+            </p>
+          )}
           <div style={{ marginTop: 20 }}>
-            <div style={{ color: "#666", fontSize: 13, marginBottom: 8 }}>Activity Log</div>
+            <div style={{ color: G.parchDim, fontSize: 12, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Cinzel', serif", marginBottom: 8 }}>Activity Log</div>
             <div ref={logRef} style={sty.log}>
-              {log.length === 0 && <div style={{ color: "#444" }}>No activity yet...</div>}
+              {log.length === 0 && <div style={{ color: G.woodLight, fontStyle: "italic" }}>No activity yet...</div>}
               {log.map((l, i) => <div key={i}>{l.msg}</div>)}
             </div>
           </div>
@@ -607,7 +713,7 @@ export default function ChainCardsGame() {
       {/* Collection */}
       {screen === "collection" && (
         <div style={sty.section}>
-          <h2 style={{ color: "#ffd700", margin: "0 0 16px" }}>Your Collection</h2>
+          <h2 style={sty.h2}>Your Collection</h2>
           <div style={sty.grid}>
             {CARD_DEFS.map((c) => (
               <Card key={c.id} cardId={c.id} count={collection[c.id]} dimmed={collection[c.id] === 0} />
@@ -619,26 +725,32 @@ export default function ChainCardsGame() {
       {/* Deck Builder & Level Select */}
       {screen === "deckbuild" && !battle && (
         <div style={sty.section}>
-          <h2 style={{ color: "#ffd700", margin: "0 0 12px" }}>Select Level</h2>
+          <h2 style={sty.h2}>Choose Your Battle</h2>
           <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
             {LEVELS.map((l) => (
               <div key={l.id} onClick={() => setSelectedLevel(l.id)} style={{
-                padding: "14px 20px", borderRadius: 10, cursor: "pointer", flex: 1, maxWidth: 200,
-                border: selectedLevel === l.id ? "2px solid #ffd700" : "2px solid #333",
-                background: selectedLevel === l.id ? "#ffd70012" : "#111", transition: "all 0.2s"
+                padding: "14px 20px", borderRadius: 6, cursor: "pointer", flex: 1, maxWidth: 200,
+                border: selectedLevel === l.id ? `2px solid ${G.gold}` : `2px solid ${G.woodLight}`,
+                background: selectedLevel === l.id
+                  ? `linear-gradient(160deg, ${G.goldDeep}, #2a1204)`
+                  : `linear-gradient(160deg, ${G.woodMid}, ${G.woodDark})`,
+                transition: "all 0.2s",
+                boxShadow: selectedLevel === l.id ? `0 0 12px ${G.goldDim}66` : "none",
               }}>
                 <div style={{ fontSize: 28 }}>{l.emoji}</div>
-                <div style={{ fontWeight: 700, margin: "4px 0" }}>{l.name}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>Enemy HP: {l.hp}</div>
-                <div style={{ fontSize: 11, color: "#666" }}>
-                  Turns: {l.actions.map((a) => `${a.a}⚔/${a.d}🛡`).join(" → ")}
+                <div style={{ fontWeight: 700, margin: "4px 0", fontFamily: "'Cinzel', serif", fontSize: 13, color: G.parchment }}>{l.name}</div>
+                <div style={{ fontSize: 13, color: G.parchDim, fontStyle: "italic" }}>Enemy HP: {l.hp}</div>
+                <div style={{ fontSize: 11, color: G.woodLight, marginTop: 4 }}>
+                  {l.actions.map((a) => `${a.a}⚔ ${a.d}🛡`).join(" · ")}
                 </div>
               </div>
             ))}
           </div>
 
-          <h2 style={{ color: "#ffd700", margin: "0 0 8px" }}>Build Deck ({deck.length}/{DECK_SIZE})</h2>
-          <p style={{ fontSize: 12, color: "#666", margin: "0 0 12px" }}>Click cards to add/remove. You need exactly 15 cards.</p>
+          <h2 style={{ ...sty.h2, marginTop: 8 }}>Build Deck ({deck.length}/{DECK_SIZE})</h2>
+          <p style={{ fontSize: 14, color: G.parchDim, fontStyle: "italic", margin: "0 0 14px" }}>
+            Click cards to add or remove. Exactly 15 required.
+          </p>
 
           <div style={sty.grid}>
             {CARD_DEFS.map((c) => {
@@ -647,15 +759,19 @@ export default function ChainCardsGame() {
               const invalid = deckInvalid.includes(c.id);
               return (
                 <div key={c.id} style={{ position: "relative" }}>
-                  {invalid && <div style={{ position: "absolute", top: -8, left: 0, right: 0, textAlign: "center", fontSize: 10, color: "#ff6b6b", zIndex: 1 }}>⚠️ traded away</div>}
+                  {invalid && (
+                    <div style={{ position: "absolute", top: -10, left: 0, right: 0, textAlign: "center", fontSize: 10, color: G.red, zIndex: 1, fontFamily: "'Cinzel', serif" }}>
+                      ⚠ traded
+                    </div>
+                  )}
                   <Card cardId={c.id} small onClick={() => toggleDeckCard(c.id)}
-                    selected={inDeck > 0} count={collection[c.id]}
-                    dimmed={invalid} />
+                    selected={inDeck > 0} count={collection[c.id]} dimmed={invalid} />
                   {inDeck > 0 && (
                     <div style={{
-                      position: "absolute", bottom: -6, left: "50%", transform: "translateX(-50%)",
-                      background: "#ffd700", color: "#000", borderRadius: 10, padding: "1px 8px",
-                      fontSize: 11, fontWeight: 700
+                      position: "absolute", bottom: -7, left: "50%", transform: "translateX(-50%)",
+                      background: `linear-gradient(135deg, ${G.gold}, ${G.goldDim})`,
+                      color: G.woodDark, borderRadius: 8, padding: "1px 8px",
+                      fontSize: 11, fontWeight: 700, fontFamily: "'Cinzel', serif",
                     }}>×{inDeck}</div>
                   )}
                 </div>
@@ -664,29 +780,29 @@ export default function ChainCardsGame() {
           </div>
 
           {deck.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
-                Deck: {deck.map((d) => CARD_DEFS[d].name).join(", ")}
+            <div style={{ marginTop: 16, padding: "10px 14px", background: "rgba(0,0,0,0.3)", borderRadius: 4, border: `1px solid ${G.woodLight}` }}>
+              <div style={{ fontSize: 13, color: G.parchDim, marginBottom: 4, fontStyle: "italic" }}>
+                {deck.map((d) => CARD_DEFS[d].name).join(", ")}
               </div>
-              <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#aaa" }}>
-                <span>Total ATK: {deck.reduce((s, d) => s + CARD_DEFS[d].atk, 0)}</span>
-                <span>Total DEF: {deck.reduce((s, d) => s + CARD_DEFS[d].def, 0)}</span>
-                <span>Avg ATK: {(deck.reduce((s, d) => s + CARD_DEFS[d].atk, 0) / deck.length).toFixed(1)}</span>
+              <div style={{ display: "flex", gap: 16, fontSize: 13, color: G.parchDim }}>
+                <span>ATK {deck.reduce((s, d) => s + CARD_DEFS[d].atk, 0)}</span>
+                <span>DEF {deck.reduce((s, d) => s + CARD_DEFS[d].def, 0)}</span>
+                <span>Avg ⚔ {(deck.reduce((s, d) => s + CARD_DEFS[d].atk, 0) / deck.length).toFixed(1)}</span>
               </div>
             </div>
           )}
 
           {deckInvalid.length > 0 && (
-            <div style={{ color: "#ff6b6b", fontSize: 12, margin: "8px 0" }}>
-              ⚠️ Cards no longer owned: {deckInvalid.map(id => CARD_DEFS[id].name).join(", ")}. Remove them before starting.
+            <div style={{ color: G.red, fontSize: 13, margin: "10px 0", fontStyle: "italic" }}>
+              ⚠️ No longer owned: {deckInvalid.map(id => CARD_DEFS[id].name).join(", ")}
             </div>
           )}
           <button
             onClick={startGame}
             disabled={deck.length !== DECK_SIZE || selectedLevel === null || deckInvalid.length > 0}
-            style={{ ...sty.btn(deck.length !== DECK_SIZE || selectedLevel === null || deckInvalid.length > 0), marginTop: 8 }}
+            style={{ ...sty.btn(deck.length !== DECK_SIZE || selectedLevel === null || deckInvalid.length > 0), marginTop: 14 }}
           >
-            Start Game
+            Enter Battle
           </button>
         </div>
       )}
@@ -694,35 +810,44 @@ export default function ChainCardsGame() {
       {/* Battle Screen */}
       {screen === "battle" && battle && (
         <div style={sty.section}>
+          {/* HP bars */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 13, color: "#888" }}>You</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>HP {battle.playerHp}</div>
-                <div style={{ width: 150, height: 10, background: "#222", borderRadius: 5, overflow: "hidden" }}>
+              <div style={{ fontSize: 12, color: G.parchDim, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>You</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+                <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Cinzel', serif", color: G.parchment }}>
+                  {battle.playerHp} <span style={{ fontSize: 13, color: G.parchDim }}>/ {PLAYER_MAX_HP}</span>
+                </div>
+                <div style={{ width: 140, height: 8, background: "rgba(0,0,0,0.5)", borderRadius: 4, overflow: "hidden", border: `1px solid ${G.woodLight}` }}>
                   <div style={{
                     width: `${(battle.playerHp / PLAYER_MAX_HP) * 100}%`, height: "100%",
-                    background: battle.playerHp > 15 ? "#4a4" : battle.playerHp > 7 ? "#da4" : "#d44",
-                    transition: "width 0.3s"
+                    background: battle.playerHp > 15 ? "#4a8a3a" : battle.playerHp > 7 ? "#c9a030" : G.red,
+                    transition: "width 0.4s",
                   }} />
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: "#666" }}>Deck: {battle.deckSize} cards | Turn {battle.turn + 1}</div>
+              <div style={{ fontSize: 12, color: G.parchDim, marginTop: 3, fontStyle: "italic" }}>
+                {battle.deckSize} cards remaining · Turn {battle.turn + 1}
+              </div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 13, color: "#888" }}>{LEVELS[battle.level].name} {LEVELS[battle.level].emoji}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end" }}>
-                <div style={{ width: 150, height: 10, background: "#222", borderRadius: 5, overflow: "hidden" }}>
+              <div style={{ fontSize: 13, color: G.parchDim, fontFamily: "'Cinzel', serif" }}>
+                {LEVELS[battle.level].emoji} {LEVELS[battle.level].name}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <div style={{ width: 140, height: 8, background: "rgba(0,0,0,0.5)", borderRadius: 4, overflow: "hidden", border: `1px solid ${G.woodLight}` }}>
                   <div style={{
                     width: `${(battle.enemyHp / LEVELS[battle.level].hp) * 100}%`, height: "100%",
-                    background: "#d44", transition: "width 0.3s"
+                    background: G.red, transition: "width 0.4s",
                   }} />
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>HP {battle.enemyHp}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Cinzel', serif", color: G.parchment }}>
+                  {battle.enemyHp} <span style={{ fontSize: 13, color: G.parchDim }}>/ {LEVELS[battle.level].hp}</span>
+                </div>
               </div>
               {battle.phase === "play" && (() => {
                 const ea = LEVELS[battle.level].actions[battle.turn % LEVELS[battle.level].actions.length];
-                return <div style={{ fontSize: 11, color: "#a66" }}>Next enemy action: ⚔{ea.a} 🛡{ea.d}</div>;
+                return <div style={{ fontSize: 12, color: "#c07060", fontStyle: "italic", marginTop: 3 }}>Incoming: ⚔ {ea.a} · 🛡 {ea.d}</div>;
               })()}
             </div>
           </div>
@@ -730,7 +855,7 @@ export default function ChainCardsGame() {
           {/* Pending tx states */}
           {PENDING_PHASES.includes(battle.phase) && (
             <div style={sty.pending}>
-              <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+              <div style={{ fontSize: 22, marginBottom: 6 }}>⏳</div>
               {PENDING_LABELS[battle.phase]}
             </div>
           )}
@@ -738,10 +863,10 @@ export default function ChainCardsGame() {
           {/* Play phase */}
           {battle.phase === "play" && (
             <>
-              <div style={{ fontSize: 13, color: "#aaa", marginBottom: 8 }}>
-                Select up to 3 cards to play ({battle.selectedCards.length}/3):
+              <div style={{ fontSize: 14, color: G.parchDim, fontStyle: "italic", marginBottom: 10 }}>
+                Choose up to 3 cards ({battle.selectedCards.length}/3):
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
                 {battle.hand.slice(0, battle.handSize).map((cardId, idx) => (
                   <Card key={idx} cardId={cardId} small
                     selected={battle.selectedCards.includes(idx)}
@@ -749,16 +874,12 @@ export default function ChainCardsGame() {
                 ))}
               </div>
               {battle.selectedCards.length > 0 && (
-                <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>
-                  Combined: ⚔{battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].atk, 0)}
-                  {" "} 🛡{battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].def, 0)}
+                <div style={{ fontSize: 14, color: G.parchDim, marginBottom: 10, fontStyle: "italic" }}>
+                  Combined: ⚔ {battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].atk, 0)}
+                  {" · "} 🛡 {battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].def, 0)}
                 </div>
               )}
-              <button
-                onClick={playTurn}
-                disabled={battle.selectedCards.length === 0}
-                style={sty.btn(battle.selectedCards.length === 0)}
-              >
+              <button onClick={playTurn} disabled={battle.selectedCards.length === 0} style={sty.btn(battle.selectedCards.length === 0)}>
                 Play Cards
               </button>
             </>
@@ -766,15 +887,15 @@ export default function ChainCardsGame() {
 
           {/* End states */}
           {(battle.phase === "won" || battle.phase === "lost") && (
-            <div style={{ textAlign: "center", padding: 30 }}>
-              <div style={{ fontSize: 48 }}>{battle.phase === "won" ? "🏆" : "💀"}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: battle.phase === "won" ? "#ffd700" : "#ff4444", marginTop: 8 }}>
-                {battle.phase === "won" ? "VICTORY!" : "DEFEAT"}
+            <div style={{ textAlign: "center", padding: "30px 0" }}>
+              <div style={{ fontSize: 52 }}>{battle.phase === "won" ? "🏆" : "💀"}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Cinzel Decorative', serif", letterSpacing: 3, marginTop: 10,
+                color: battle.phase === "won" ? G.gold : G.red,
+                textShadow: battle.phase === "won" ? `0 0 20px ${G.goldDim}` : "none",
+              }}>
+                {battle.phase === "won" ? "Victory" : "Defeat"}
               </div>
-              <button
-                onClick={() => { setBattle(null); setScreen("deckbuild"); }}
-                style={{ ...sty.btn(false), marginTop: 20 }}
-              >
+              <button onClick={() => { setBattle(null); setScreen("deckbuild"); }} style={{ ...sty.btn(false), marginTop: 20 }}>
                 Play Again
               </button>
             </div>
@@ -782,25 +903,19 @@ export default function ChainCardsGame() {
 
           {/* Battle log */}
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 11, color: "#555", marginBottom: 4 }}>Battle Log</div>
-            <div style={{
-              maxHeight: 140, overflowY: "auto", background: "#0a0a14", border: "1px solid #1a1a2a",
-              borderRadius: 6, padding: 8, fontSize: 12, color: "#7a7a6a", lineHeight: 1.6
-            }}>
+            <div style={{ fontSize: 11, color: G.woodLight, marginBottom: 4, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>Battle Log</div>
+            <div style={{ ...sty.log, maxHeight: 140 }}>
               {battle.battleLog.map((l, i) => (
                 <div key={i} style={{
-                  color: l.startsWith("🏆") ? "#ffd700" : l.startsWith("💀") ? "#f44" :
-                    l.startsWith("---") ? "#555" : "#8a8a7a"
+                  color: l.startsWith("🏆") ? G.gold : l.startsWith("💀") ? G.red :
+                    l.startsWith("---") ? G.woodLight : G.parchDim
                 }}>{l}</div>
               ))}
             </div>
           </div>
 
-          {/* Forfeit (only when player can act) */}
-          {(battle.phase === "play") && (
-            <button onClick={handleForfeit} style={{ ...sty.btnDanger, marginTop: 12 }}>
-              Forfeit
-            </button>
+          {battle.phase === "play" && (
+            <button onClick={handleForfeit} style={{ ...sty.btnDanger, marginTop: 12 }}>Forfeit</button>
           )}
         </div>
       )}
@@ -808,36 +923,35 @@ export default function ChainCardsGame() {
       {/* Shop */}
       {screen === "shop" && (
         <div style={sty.section}>
-          <h2 style={{ color: "#ffd700", margin: "0 0 16px" }}>Booster Shop</h2>
-          <div style={{
-            background: "#111", border: "1px solid #333", borderRadius: 12, padding: 24,
-            maxWidth: 400, textAlign: "center"
-          }}>
-            <div style={{ fontSize: 48 }}>📦</div>
-            <div style={{ fontSize: 18, fontWeight: 700, margin: "8px 0" }}>Booster Pack</div>
-            <div style={{ color: "#888", fontSize: 14 }}>3 random cards — 1 DOT</div>
+          <h2 style={sty.h2}>Merchant's Stall</h2>
+          <div style={{ ...sty.panel, maxWidth: 380, textAlign: "center" }}>
+            <div style={{ fontSize: 52 }}>📦</div>
+            <div style={{ fontSize: 17, fontWeight: 700, margin: "8px 0", fontFamily: "'Cinzel', serif", color: G.parchment, letterSpacing: 1 }}>
+              Booster Pack
+            </div>
+            <div style={{ color: G.parchDim, fontSize: 14, fontStyle: "italic" }}>3 random cards · 1 DOT</div>
 
             {packState === "idle" && !packResult && (
-              <button onClick={handleCommitPack} style={{ ...sty.btn(false), marginTop: 16 }}>
-                Buy Pack (1 DOT)
+              <button onClick={handleCommitPack} style={{ ...sty.btn(false), marginTop: 18 }}>
+                Purchase Pack
               </button>
             )}
             {(packState === "committing" || packState === "opening") && (
-              <div style={{ color: "#888", marginTop: 16 }}>⏳ Processing...</div>
+              <div style={{ color: G.parchDim, marginTop: 16, fontStyle: "italic" }}>⏳ Processing…</div>
             )}
             {packState === "committed" && (
               <button onClick={handleOpenPack} style={{ ...sty.btn(false), marginTop: 16 }}>
-                Open Pack!
+                Open Pack
               </button>
             )}
 
             {packResult && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 13, color: "#ffd700", marginBottom: 10 }}>You got:</div>
+              <div style={{ marginTop: 18 }}>
+                <div style={{ fontSize: 14, color: G.gold, marginBottom: 12, fontFamily: "'Cinzel', serif", letterSpacing: 1 }}>You received:</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
                   {packResult.map((cardId, i) => <Card key={i} cardId={cardId} small />)}
                 </div>
-                <button onClick={() => setPackResult(null)} style={{ ...sty.btn(false), marginTop: 16 }}>
+                <button onClick={() => setPackResult(null)} style={{ ...sty.btn(false), marginTop: 18 }}>
                   Buy Another
                 </button>
               </div>
@@ -849,90 +963,76 @@ export default function ChainCardsGame() {
       {/* Trade */}
       {screen === "trade" && (
         <div style={sty.section}>
-          <h2 style={{ color: "#ffd700", margin: "0 0 16px" }}>Trading Post</h2>
+          <h2 style={sty.h2}>Trading Post</h2>
 
-          <div style={{ background: "#111", border: "1px solid #333", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, marginBottom: 12 }}>Create Offer</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
-              <label>
-                Card:
-                <select
-                  value={tradeForm.cardId}
-                  onChange={(e) => setTradeForm({ ...tradeForm, cardId: +e.target.value })}
-                  style={{ marginLeft: 6, background: "#222", color: "#ddd", border: "1px solid #444", borderRadius: 4, padding: "4px 8px" }}
-                >
+          <div style={{ ...sty.panel, marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, marginBottom: 14, fontFamily: "'Cinzel', serif", fontSize: 13, letterSpacing: 1, color: G.gold }}>
+              Post an Offer
+            </div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", fontSize: 14 }}>
+              <label style={{ color: G.parchDim }}>
+                Offer:
+                <select value={tradeForm.cardId} onChange={(e) => setTradeForm({ ...tradeForm, cardId: +e.target.value })} style={sty.input}>
                   {CARD_DEFS.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name} (own: {collection[c.id]})</option>
+                    <option key={c.id} value={c.id}>{c.name} (×{collection[c.id]})</option>
                   ))}
                 </select>
               </label>
-              <label>
-                Want:
-                <select
-                  value={tradeForm.wantsCard ? "card" : "tokens"}
-                  onChange={(e) => setTradeForm({ ...tradeForm, wantsCard: e.target.value === "card" })}
-                  style={{ marginLeft: 6, background: "#222", color: "#ddd", border: "1px solid #444", borderRadius: 4, padding: "4px 8px" }}
-                >
-                  <option value="tokens">DOT</option>
-                  <option value="card">Card</option>
+              <label style={{ color: G.parchDim }}>
+                In exchange for:
+                <select value={tradeForm.wantsCard ? "card" : "tokens"} onChange={(e) => setTradeForm({ ...tradeForm, wantsCard: e.target.value === "card" })} style={sty.input}>
+                  <option value="tokens">DOT tokens</option>
+                  <option value="card">A specific card</option>
                 </select>
               </label>
               {tradeForm.wantsCard ? (
-                <label>
-                  Card:
-                  <select
-                    value={tradeForm.wantedCardId}
-                    onChange={(e) => setTradeForm({ ...tradeForm, wantedCardId: +e.target.value })}
-                    style={{ marginLeft: 6, background: "#222", color: "#ddd", border: "1px solid #444", borderRadius: 4, padding: "4px 8px" }}
-                  >
+                <label style={{ color: G.parchDim }}>
+                  Which card:
+                  <select value={tradeForm.wantedCardId} onChange={(e) => setTradeForm({ ...tradeForm, wantedCardId: +e.target.value })} style={sty.input}>
                     {CARD_DEFS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </label>
               ) : (
-                <label>
-                  Price (DOT units):
-                  <input
-                    type="number" value={tradeForm.price} min={1}
+                <label style={{ color: G.parchDim }}>
+                  Price (DOT):
+                  <input type="number" value={tradeForm.price} min={1}
                     onChange={(e) => setTradeForm({ ...tradeForm, price: +e.target.value })}
-                    style={{ marginLeft: 6, width: 70, background: "#222", color: "#ddd", border: "1px solid #444", borderRadius: 4, padding: "4px 8px" }}
+                    style={{ ...sty.input, width: 70 }}
                   />
                 </label>
               )}
               <button onClick={handleCreateTrade} disabled={tradePending} style={sty.btn(tradePending)}>
-                List
+                Post
               </button>
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <div style={{ fontWeight: 700 }}>Active Offers</div>
-            <button onClick={loadTrades} style={{ ...sty.btnDanger, borderColor: "#444", color: "#888", fontSize: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, letterSpacing: 1, color: G.gold }}>Active Offers</div>
+            <button onClick={loadTrades} style={{ ...sty.btnDanger, borderColor: G.woodLight, color: G.parchDim, fontSize: 11 }}>
               Refresh
             </button>
           </div>
-          {trades.length === 0 && <div style={{ color: "#555", fontSize: 13 }}>No active trades.</div>}
+          {trades.length === 0 && <div style={{ color: G.parchDim, fontSize: 14, fontStyle: "italic" }}>The board is empty. Be the first to post an offer.</div>}
           {trades.map((t, i) => (
             <div key={i} style={{
-              display: "flex", alignItems: "center", gap: 16, padding: "10px 16px",
-              background: "#111", border: "1px solid #222", borderRadius: 8, marginBottom: 8
+              display: "flex", alignItems: "center", gap: 14, padding: "10px 14px",
+              background: `linear-gradient(90deg, ${G.woodMid}, ${G.woodDark})`,
+              border: `1px solid ${G.woodLight}`, borderRadius: 6, marginBottom: 8,
             }}>
               <Card cardId={t.offeredCardId} small />
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>Offering: {CARD_DEFS[t.offeredCardId].name}</div>
-                <div style={{ fontSize: 12, color: "#888" }}>
-                  Wants: {t.wantsCard
-                    ? CARD_DEFS[t.wantedCardId].name
-                    : `${(Number(t.tokenPrice) / 1e10).toFixed(2)} DOT`}
+                <div style={{ fontWeight: 600, fontFamily: "'Cinzel', serif", fontSize: 12, color: G.parchment }}>{CARD_DEFS[t.offeredCardId].name}</div>
+                <div style={{ fontSize: 13, color: G.parchDim, fontStyle: "italic", marginTop: 2 }}>
+                  for {t.wantsCard ? CARD_DEFS[t.wantedCardId].name : `${(Number(t.tokenPrice) / 1e10).toFixed(2)} DOT`}
                 </div>
-                <div style={{ fontSize: 11, color: "#555" }}>
-                  Seller: {t.seller?.toLowerCase() === account?.toLowerCase()
-                    ? "You"
-                    : `${t.seller?.slice(0, 6)}...${t.seller?.slice(-4)}`}
+                <div style={{ fontSize: 11, color: G.woodLight, marginTop: 2 }}>
+                  {t.seller?.toLowerCase() === account?.toLowerCase() ? "Your listing" : `${t.seller?.slice(0, 6)}…${t.seller?.slice(-4)}`}
                 </div>
               </div>
               {t.seller?.toLowerCase() === account?.toLowerCase() ? (
                 <button onClick={() => handleCancelTrade(t.id)} disabled={tradePending} style={sty.btnDanger}>
-                  Cancel
+                  Withdraw
                 </button>
               ) : (
                 <button

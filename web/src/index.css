@@ -1,0 +1,43 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Crimson Pro', Georgia, serif;
+  color: #e8d5b7;
+
+  /* Wood grain: layered gradients simulating horizontal grain */
+  background-color: #1c0e04;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px, transparent 4px,
+      rgba(0,0,0,0.06) 4px, rgba(0,0,0,0.06) 5px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255,180,80,0.02) 0px, rgba(255,180,80,0.02) 1px,
+      transparent 1px, transparent 6px
+    ),
+    repeating-linear-gradient(
+      176deg,
+      transparent 0px, transparent 40px,
+      rgba(0,0,0,0.07) 40px, rgba(0,0,0,0.07) 41px,
+      transparent 41px, transparent 80px
+    ),
+    linear-gradient(
+      180deg,
+      #2e1a08 0%, #1c0e04 20%, #2a1608 40%, #1c0e04 60%, #2e1a08 80%, #1c0e04 100%
+    );
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1c0e04; }
+::-webkit-scrollbar-thumb { background: #5a3a18; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #7a5a28; }
+
+select, input {
+  font-family: 'Crimson Pro', Georgia, serif;
+}
+
+button {
+  font-family: 'Cinzel', serif;
+}
