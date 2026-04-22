@@ -19,8 +19,8 @@ export const publicClient = createPublicClient({
 });
 
 const LOCAL_CHAIN = {
-  id: 420420421,
-  name: "Polkadot Local",
+  id: 31337,
+  name: "Card Game Local",
   nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 10 },
   rpcUrls: { default: { http: [RPC_URL] } },
 };
@@ -32,7 +32,7 @@ export async function ensureLocalNetwork() {
   try {
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: "0x190f1b45" }], // 420420421
+      params: [{ chainId: "0x7A69" }], // 31337
     });
   } catch (e: any) {
     // 4902 = chain not added yet
@@ -40,8 +40,8 @@ export async function ensureLocalNetwork() {
       await window.ethereum.request({
         method: "wallet_addEthereumChain",
         params: [{
-          chainId: "0x190f1b45",
-          chainName: "Polkadot Local",
+          chainId: "0x7A69",
+          chainName: "Card Game Local",
           nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 10 },
           rpcUrls: ["http://127.0.0.1:8545"],
         }],
@@ -65,17 +65,41 @@ function gameContract() {
   });
 }
 
+export async function waitForNextBlock(timeout = 30_000) {
+  const start = await publicClient.getBlockNumber();
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1_000));
+    if (await publicClient.getBlockNumber() > start) return;
+  }
+  throw new Error("Timed out waiting for next block");
+}
+
+async function waitForNonceIncrease(address: `0x${string}`, nonceBefore: bigint, timeout = 30_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const nonce = await publicClient.getTransactionCount({ address, blockTag: "latest" });
+    if (BigInt(nonce) > nonceBefore) return;
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+  throw new Error("Timed out waiting for transaction to be included in a block");
+}
+
 async function sendTx(functionName: string, args?: unknown[], value?: bigint) {
   const wallet = await getWalletClient();
+  const address = wallet.account.address as `0x${string}`;
+  const nonceBefore = BigInt(await publicClient.getTransactionCount({ address, blockTag: "latest" }));
   const hash = await wallet.writeContract({
     address: deployment.address as `0x${string}`,
     abi: deployment.abi,
     functionName,
     args,
     value,
-    gas: 500_000n, // explicit limit so wallets don't estimate without value
+    gas: 500_000n,
   } as any);
-  return publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 1_000 });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 1_000 });
+  await waitForNonceIncrease(address, nonceBefore);
+  return receipt;
 }
 
 export function parseReceiptLogs(receipt: any) {
@@ -101,6 +125,15 @@ export const getTradeDetails = (tradeId: bigint) =>
 
 export const getWalletBalance = (address: string) =>
   publicClient.getBalance({ address: address as `0x${string}` });
+
+export async function getPackPending(player: string): Promise<boolean> {
+  const addr = deployment.address as `0x${string}`;
+  const [committed, opened] = await Promise.all([
+    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackCommitted", inputs: [{ name: "player", type: "address", indexed: true }] }, args: { player: player as `0x${string}` }, fromBlock: 0n }),
+    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackOpened", inputs: [{ name: "player", type: "address", indexed: true }, { name: "card0", type: "uint8", indexed: false }, { name: "card1", type: "uint8", indexed: false }, { name: "card2", type: "uint8", indexed: false }] }, args: { player: player as `0x${string}` }, fromBlock: 0n }),
+  ]);
+  return committed.length > opened.length;
+}
 
 // ─── Writes ────────────────────────────────────────────────────
 

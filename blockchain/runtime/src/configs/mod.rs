@@ -321,9 +321,9 @@ impl pallet_revive::Config for Runtime {
 	type InstantiateOrigin = EnsureSigned<Self::AccountId>;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type CodeHashLockupDepositPercent = CodeHashLockupDepositPercent;
-	/// EVM chain ID for local dev. The Polkadot Hub TestNet uses 420420417; this local
-	/// value avoids collisions. Must match the chain ID expected by eth-rpc and wallets.
-	type ChainId = ConstU64<420_420_421>;
+	/// EVM chain ID for local dev. Using 31337 (Hardhat standard) to avoid conflicts
+	/// with known public networks (420420421 is Westend Asset Hub, which Talisman overrides).
+	type ChainId = ConstU64<31_337>;
 	type NativeToEthRatio = ConstU32<1_000_000>;
 	type FindAuthor = <Runtime as pallet_authorship::Config>::FindAuthor;
 	type AllowEVMBytecode = ConstBool<true>;

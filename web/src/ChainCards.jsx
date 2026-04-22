@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { formatUnits } from "viem";
 
 import {
   getCollection,
@@ -18,6 +19,8 @@ import {
   getGame as contractGetGame,
   getStarterClaimed,
   getWalletBalance,
+  getPackPending,
+  waitForNextBlock,
   parseReceiptLogs,
 } from "./hooks/useContract";
 
@@ -144,8 +147,11 @@ export default function ChainCardsGame() {
     getCollection(account).then((counts) => setCollection(counts.map(Number)));
     getStarterClaimed(account).then(setStarterClaimed);
     getWalletBalance(account).then((bal) =>
-      setWalletBalance((Number(bal) / 1e10).toFixed(2))
+      setWalletBalance(parseFloat(formatUnits(bal, 16)).toFixed(2))
     );
+    getPackPending(account).then((pending) => {
+      if (pending) setPackState("committed");
+    });
   }, [account]);
 
   // Resume active game on load
@@ -197,7 +203,7 @@ export default function ChainCardsGame() {
       if (player.toLowerCase() === account.toLowerCase()) {
         getCollection(account).then((c) => setCollection(c.map(Number)));
         getWalletBalance(account).then((bal) =>
-          setWalletBalance((Number(bal) / 1e10).toFixed(2))
+          setWalletBalance(parseFloat(formatUnits(bal, 16)).toFixed(2))
         );
       }
     });
@@ -207,7 +213,7 @@ export default function ChainCardsGame() {
   const refreshBalance = useCallback(() => {
     if (!account) return;
     getWalletBalance(account)
-      .then((bal) => setWalletBalance((Number(bal) / 1e10).toFixed(2)))
+      .then((bal) => setWalletBalance(parseFloat(formatUnits(bal, 16)).toFixed(2)))
       .catch(() => {});
   }, [account]);
 
@@ -265,12 +271,18 @@ export default function ChainCardsGame() {
     try {
       setPackState("committing");
       await contractCommitPack();
+      await waitForNextBlock();
       setPackState("committed");
       refreshBalance();
       addLog("📦 Pack committed — ready to open!");
     } catch (e) {
-      setPackState("idle");
-      addLog(`❌ Pack commit failed: ${e.message}`);
+      if (e.message?.includes("Pack already committed")) {
+        setPackState("committed");
+        addLog("📦 Pack already committed — click Open Pack to reveal!");
+      } else {
+        setPackState("idle");
+        addLog(`❌ Pack commit failed: ${e.message}`);
+      }
     }
   };
 
@@ -340,6 +352,7 @@ export default function ChainCardsGame() {
         ...prev, phase: "dealing",
         battleLog: [...prev.battleLog, "Dealing hand on-chain..."],
       }));
+      await waitForNextBlock();
       const receipt = await contractDealHand();
       const hand = parseHandFromReceipt(receipt, account);
       setBattle((prev) => ({
@@ -410,6 +423,7 @@ export default function ChainCardsGame() {
             turn: prev.turn + 1, deckSize: prev.deckSize + unplayed,
             battleLog: bLog,
           }));
+          await waitForNextBlock();
           const dealReceipt = await contractDealHand();
           const hand = parseHandFromReceipt(dealReceipt, account);
           setBattle((prev) => ({
