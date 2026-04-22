@@ -97,9 +97,7 @@ async function sendTx(functionName: string, args?: unknown[], value?: bigint) {
     value,
     gas: 500_000n,
   } as any);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 400 });
-  await waitForNonceIncrease(address, nonceBefore);
-  return receipt;
+  return publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 400 });
 }
 
 export function parseReceiptLogs(receipt: any) {

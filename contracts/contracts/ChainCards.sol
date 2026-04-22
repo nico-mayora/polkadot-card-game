@@ -172,7 +172,6 @@ contract ChainCards {
         cards[14] = CardDef(CardType.Drain, 10, 3);   // Soul Rend   (10 dmg + 5 heal)
 
         // ---- Level 0: Goblin Camp (HP 40) ------------------------------------
-        // Pattern: hit, shield, hit harder, regen — punishes slow players
         levels[0] = LevelDef(40, 4);
         enemyActions[0][0] = EnemyAction(EnemyActionType.Attack,  8);
         enemyActions[0][1] = EnemyAction(EnemyActionType.Shield,  7);
@@ -180,8 +179,6 @@ contract ChainCards {
         enemyActions[0][3] = EnemyAction(EnemyActionType.Regen,   6);
 
         // ---- Level 1: Dark Forest (HP 60) ------------------------------------
-        // Pattern: hit, shield, buff, big hit, regen — buff on turn 3 telegraphs
-        //          a devastating turn-4 strike (14×2=28); regen if you survive
         levels[1] = LevelDef(60, 5);
         enemyActions[1][0] = EnemyAction(EnemyActionType.Attack, 10);
         enemyActions[1][1] = EnemyAction(EnemyActionType.Shield,  9);
@@ -190,8 +187,6 @@ contract ChainCards {
         enemyActions[1][4] = EnemyAction(EnemyActionType.Regen,  10);
 
         // ---- Level 2: Dragon's Lair (HP 90) ----------------------------------
-        // Pattern: hit, heavy shield, buff, massive hit (18×2=36 ≈ one-shot),
-        //          big regen, hit — must plan blocks for turn 4 or die
         levels[2] = LevelDef(90, 6);
         enemyActions[2][0] = EnemyAction(EnemyActionType.Attack, 13);
         enemyActions[2][1] = EnemyAction(EnemyActionType.Shield, 14);
@@ -324,7 +319,7 @@ contract ChainCards {
         require(g.phase == Phase.Dealt, "No hand dealt");
         require(handIndices.length >= 1 && handIndices.length <= g.handSize, "Invalid card count");
 
-        bool[5] memory used;
+        bool[HAND_SIZE] memory used;
 
         // Working copies
         uint8 pHp      = g.playerHp;
@@ -345,10 +340,9 @@ contract ChainCards {
             manaUsed += c.cost;
 
             if (c.cardType == CardType.Attack) {
-                uint8 blocked = eBlock < c.value ? eBlock : c.value;
-                uint8 dmg     = c.value - blocked;
-                eBlock        = eBlock > c.value ? eBlock - c.value : 0;
-                eHp           = eHp > dmg ? eHp - dmg : 0;
+                (uint8 dmg, uint8 rem) = _blockDamage(eBlock, c.value);
+                eBlock = rem;
+                eHp    = eHp > dmg ? eHp - dmg : 0;
             } else if (c.cardType == CardType.Smite) {
                 eHp = eHp > c.value ? eHp - c.value : 0;
             } else if (c.cardType == CardType.Block) {
@@ -357,13 +351,12 @@ contract ChainCards {
                 uint8 space = PLAYER_MAX_HP - pHp;
                 pHp += space < c.value ? space : c.value;
             } else if (c.cardType == CardType.Drain) {
-                uint8 blocked = eBlock < c.value ? eBlock : c.value;
-                uint8 dmg     = c.value - blocked;
-                eBlock        = eBlock > c.value ? eBlock - c.value : 0;
-                eHp           = eHp > dmg ? eHp - dmg : 0;
-                uint8 heal    = c.value / 2;
-                uint8 space   = PLAYER_MAX_HP - pHp;
-                pHp           += space < heal ? space : heal;
+                (uint8 dmg, uint8 rem) = _blockDamage(eBlock, c.value);
+                eBlock = rem;
+                eHp    = eHp > dmg ? eHp - dmg : 0;
+                uint8 heal  = c.value / 2;
+                uint8 space = PLAYER_MAX_HP - pHp;
+                pHp += space < heal ? space : heal;
             }
 
             if (eHp == 0) break;
@@ -660,6 +653,12 @@ contract ChainCards {
             toDeal > 4 ? g.hand[4] : 0,
             toDeal
         );
+    }
+
+    function _blockDamage(uint8 block_, uint8 value) private pure returns (uint8 dmg, uint8 remainingBlock) {
+        uint8 absorbed = block_ < value ? block_ : value;
+        dmg            = value - absorbed;
+        remainingBlock = block_ > value ? block_ - value : 0;
     }
 
     function _clearGame(address player) private {

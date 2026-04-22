@@ -61,8 +61,6 @@ const CARD_TYPE_LABEL = [
   (v) => `🩸 ${v} dmg +${Math.floor(v/2)} hp`,
 ];
 
-const MANA_DOTS = (cost) => "◆".repeat(cost) + "◇".repeat(MANA_PER_TURN - cost);
-
 const LEVELS = [
   { id: 0, name: "Goblin Camp",   emoji: "👺", hp: 40, actions: [
     {type:EA_ATTACK,v:8}, {type:EA_SHIELD,v:7}, {type:EA_ATTACK,v:10}, {type:EA_REGEN,v:6},
@@ -85,7 +83,7 @@ const enemyActionLabel = (ea, buffed) => {
   return `💚 Regens ${ea.v} HP`;
 };
 
-const DECK_SIZE = 15, HAND_SIZE = 5, MAX_PLAY = 3, PLAYER_MAX_HP = 40;
+const DECK_SIZE = 15, HAND_SIZE = 5, PLAYER_MAX_HP = 40;
 
 function parseHandFromReceipt(receipt, account) {
   const logs = parseReceiptLogs(receipt);
@@ -463,7 +461,7 @@ export default function ChainCardsGame() {
 
         if (!endEv) {
           if (eaType === EA_ATTACK) {
-            bLog.push(`Enemy: ⚔ attacks → you take ${nTaken} dmg${nBlock > 0 && nTaken === 0 ? " (blocked!)" : ""} → HP ${nPHp}/${PLAYER_MAX_HP}`);
+            bLog.push(`Enemy: ⚔ attacks → you take ${nTaken} dmg${nTaken === 0 ? " (blocked!)" : ""} → HP ${nPHp}/${PLAYER_MAX_HP}`);
           } else if (eaType === EA_SHIELD) {
             bLog.push(`Enemy: 🛡 shields for ${eaVal}`);
           } else if (eaType === EA_REGEN) {
