@@ -46,7 +46,8 @@ contract ChainCards {
     enum EnemyActionType {
         Attack,  // 0 — deal value damage to the player
         Shield,  // 1 — gain value block (reduces player damage next turns)
-        Buff     // 2 — next Attack deals double damage
+        Buff,    // 2 — next Attack deals double damage
+        Regen    // 3 — restore value HP (up to max)
     }
 
     struct EnemyAction {
@@ -124,7 +125,8 @@ contract ChainCards {
         uint8 enemyActionValue,
         uint8 dmgTaken,
         uint8 playerHp,
-        uint8 enemyHp
+        uint8 enemyHp,
+        uint8 newEnemyBlock
     );
     event GameEnded(address indexed player, bool won);
     event TradeCreated(uint256 indexed tradeId, address indexed seller, uint8 offeredCardId);
@@ -169,26 +171,34 @@ contract ChainCards {
         cards[ 9] = CardDef(CardType.Drain,  7, 2);   // Life Tap    (7 dmg + 3 heal)
         cards[14] = CardDef(CardType.Drain, 10, 3);   // Soul Rend   (10 dmg + 5 heal)
 
-        // ---- Level 0: Goblin Camp (HP 22) ------------------------------------
-        levels[0] = LevelDef(22, 3);
-        enemyActions[0][0] = EnemyAction(EnemyActionType.Attack,  6);
-        enemyActions[0][1] = EnemyAction(EnemyActionType.Shield,  5);
-        enemyActions[0][2] = EnemyAction(EnemyActionType.Attack,  8);
+        // ---- Level 0: Goblin Camp (HP 40) ------------------------------------
+        // Pattern: hit, shield, hit harder, regen — punishes slow players
+        levels[0] = LevelDef(40, 4);
+        enemyActions[0][0] = EnemyAction(EnemyActionType.Attack,  8);
+        enemyActions[0][1] = EnemyAction(EnemyActionType.Shield,  7);
+        enemyActions[0][2] = EnemyAction(EnemyActionType.Attack, 10);
+        enemyActions[0][3] = EnemyAction(EnemyActionType.Regen,   6);
 
-        // ---- Level 1: Dark Forest (HP 38) ------------------------------------
-        levels[1] = LevelDef(38, 4);
-        enemyActions[1][0] = EnemyAction(EnemyActionType.Attack,  9);
-        enemyActions[1][1] = EnemyAction(EnemyActionType.Shield,  7);
+        // ---- Level 1: Dark Forest (HP 60) ------------------------------------
+        // Pattern: hit, shield, buff, big hit, regen — buff on turn 3 telegraphs
+        //          a devastating turn-4 strike (14×2=28); regen if you survive
+        levels[1] = LevelDef(60, 5);
+        enemyActions[1][0] = EnemyAction(EnemyActionType.Attack, 10);
+        enemyActions[1][1] = EnemyAction(EnemyActionType.Shield,  9);
         enemyActions[1][2] = EnemyAction(EnemyActionType.Buff,    0);
-        enemyActions[1][3] = EnemyAction(EnemyActionType.Attack, 11);
+        enemyActions[1][3] = EnemyAction(EnemyActionType.Attack, 14);
+        enemyActions[1][4] = EnemyAction(EnemyActionType.Regen,  10);
 
-        // ---- Level 2: Dragon's Lair (HP 55) ----------------------------------
-        levels[2] = LevelDef(55, 5);
+        // ---- Level 2: Dragon's Lair (HP 90) ----------------------------------
+        // Pattern: hit, heavy shield, buff, massive hit (18×2=36 ≈ one-shot),
+        //          big regen, hit — must plan blocks for turn 4 or die
+        levels[2] = LevelDef(90, 6);
         enemyActions[2][0] = EnemyAction(EnemyActionType.Attack, 13);
-        enemyActions[2][1] = EnemyAction(EnemyActionType.Shield, 10);
+        enemyActions[2][1] = EnemyAction(EnemyActionType.Shield, 14);
         enemyActions[2][2] = EnemyAction(EnemyActionType.Buff,    0);
-        enemyActions[2][3] = EnemyAction(EnemyActionType.Attack, 16);
-        enemyActions[2][4] = EnemyAction(EnemyActionType.Attack, 10);
+        enemyActions[2][3] = EnemyAction(EnemyActionType.Attack, 18);
+        enemyActions[2][4] = EnemyAction(EnemyActionType.Regen,  15);
+        enemyActions[2][5] = EnemyAction(EnemyActionType.Attack, 11);
     }
 
     // =====================================================================
@@ -255,96 +265,61 @@ contract ChainCards {
     //  Game — Commit Deck
     // =====================================================================
 
+    /// @notice Commit a deck and wait for `dealHand()` in a later block.
+    ///         Prefer `commitDeckAndDeal()` to avoid the extra round-trip.
     function commitDeck(uint8 levelId, uint8[15] calldata deck) external noActiveGame {
-        require(levelId < NUM_LEVELS, "Invalid level");
+        _initGame(levelId, deck);
+    }
 
-        uint8[20] memory counts;
-        for (uint8 i = 0; i < DECK_SIZE; i++) {
-            require(deck[i] < NUM_CARDS, "Invalid card id");
-            counts[deck[i]]++;
-            require(
-                counts[deck[i]] <= cardBalance[msg.sender][deck[i]],
-                "You don't own enough copies of this card"
-            );
-        }
-
-        Game storage g = games[msg.sender];
-        g.levelId     = levelId;
-        g.phase       = Phase.Committed;
-        g.playerHp    = PLAYER_MAX_HP;
-        g.enemyHp     = levels[levelId].enemyHp;
-        g.turn        = 0;
-        g.commitBlock = block.number;
-        g.deckSize    = DECK_SIZE;
-        g.handSize    = 0;
-        g.enemyBlock  = 0;
-        g.enemyBuffed = false;
-
-        for (uint8 i = 0; i < DECK_SIZE; i++) {
-            g.deck[i] = deck[i];
-        }
-
-        emit GameStarted(msg.sender, levelId);
+    /// @notice Commit a deck AND deal the first hand in one transaction.
+    ///         Uses blockhash(block.number - 1) for randomness — slightly
+    ///         weaker than the two-step approach but fine for a card game.
+    function commitDeckAndDeal(uint8 levelId, uint8[15] calldata deck) external noActiveGame {
+        _initGame(levelId, deck);
+        _dealHand(uint256(keccak256(abi.encodePacked(
+            blockhash(block.number - 1), msg.sender, _nonce++
+        ))));
     }
 
     // =====================================================================
     //  Game — Deal Hand
     // =====================================================================
 
+    /// @notice Deal a hand from the committed deck. Must be called in a later
+    ///         block than `commitDeck`. Prefer `commitDeckAndDeal()` instead.
     function dealHand() external {
         Game storage g = games[msg.sender];
         require(g.phase == Phase.Committed, "Not in committed phase");
         require(block.number > g.commitBlock, "Wait for next block");
         require(block.number <= g.commitBlock + 256, "Commit expired, forfeit");
-
-        uint256 seed = uint256(keccak256(abi.encodePacked(
+        _dealHand(uint256(keccak256(abi.encodePacked(
             blockhash(g.commitBlock), msg.sender, _nonce++
-        )));
-
-        uint8 toDeal = g.deckSize < HAND_SIZE ? g.deckSize : HAND_SIZE;
-
-        for (uint8 i = 0; i < toDeal; i++) {
-            uint8 remaining = g.deckSize - i;
-            uint8 j = i + uint8(seed % remaining);
-            seed = uint256(keccak256(abi.encodePacked(seed)));
-            uint8 tmp  = g.deck[i];
-            g.deck[i]  = g.deck[j];
-            g.deck[j]  = tmp;
-        }
-
-        for (uint8 i = 0; i < toDeal; i++) {
-            g.hand[i] = g.deck[i];
-        }
-        g.handSize = toDeal;
-
-        uint8 newDeckSize = g.deckSize - toDeal;
-        for (uint8 i = 0; i < newDeckSize; i++) {
-            g.deck[i] = g.deck[i + toDeal];
-        }
-        g.deckSize = newDeckSize;
-        g.phase = Phase.Dealt;
-
-        emit HandDealt(
-            msg.sender,
-            toDeal > 0 ? g.hand[0] : 0,
-            toDeal > 1 ? g.hand[1] : 0,
-            toDeal > 2 ? g.hand[2] : 0,
-            toDeal > 3 ? g.hand[3] : 0,
-            toDeal > 4 ? g.hand[4] : 0,
-            toDeal
-        );
+        ))));
     }
 
     // =====================================================================
     //  Game — Play Cards & Resolve Turn
     // =====================================================================
 
-    /// @notice Play 1–3 cards from the current hand.
-    ///         Cards are processed in order. Attack chips through enemy block;
-    ///         Smite pierces block entirely; Block generates player shield this
-    ///         turn; Heal restores HP; Drain damages + heals.
-    ///         After cards resolve, the enemy takes its turn action.
+    /// @notice Play cards and wait for `dealHand()` in a later block.
+    ///         Prefer `playAndDeal()` to avoid the extra round-trip.
     function playCards(uint8[] calldata handIndices) external {
+        _resolveCombat(handIndices);
+    }
+
+    /// @notice Play cards AND immediately deal the next hand in one transaction.
+    ///         If the game ends this turn, no hand is dealt.
+    function playAndDeal(uint8[] calldata handIndices) external {
+        _resolveCombat(handIndices);
+        // Phase.Committed means the game continues; deal immediately.
+        if (games[msg.sender].phase == Phase.Committed) {
+            _dealHand(uint256(keccak256(abi.encodePacked(
+                blockhash(block.number - 1), msg.sender, _nonce++
+            ))));
+        }
+    }
+
+    function _resolveCombat(uint8[] calldata handIndices) private {
         Game storage g = games[msg.sender];
         require(g.phase == Phase.Dealt, "No hand dealt");
         require(handIndices.length >= 1 && handIndices.length <= g.handSize, "Invalid card count");
@@ -407,7 +382,7 @@ contract ChainCards {
 
         if (eHp == 0) {
             emit TurnResolved(msg.sender, dmgDealt, healAmt, pBlock,
-                uint8(ea.actionType), ea.value, 0, pHp, 0);
+                uint8(ea.actionType), ea.value, 0, pHp, 0, 0);
             emit GameEnded(msg.sender, true);
             _clearGame(msg.sender);
             return;
@@ -417,7 +392,7 @@ contract ChainCards {
         uint8 dmgTaken = 0;
 
         if (ea.actionType == EnemyActionType.Attack) {
-            uint8 atkVal  = g.enemyBuffed ? ea.value * 2 : ea.value;
+            uint8 atkVal   = g.enemyBuffed ? ea.value * 2 : ea.value;
             uint8 absorbed = pBlock < atkVal ? pBlock : atkVal;
             uint8 netDmg   = atkVal - absorbed;
             pHp            = pHp > netDmg ? pHp - netDmg : 0;
@@ -425,13 +400,17 @@ contract ChainCards {
             g.enemyBuffed  = false;
         } else if (ea.actionType == EnemyActionType.Shield) {
             g.enemyBlock += ea.value;
-        } else {
-            // Buff
+        } else if (ea.actionType == EnemyActionType.Buff) {
             g.enemyBuffed = true;
+        } else {
+            // Regen — restore HP up to the level's starting max
+            uint8 maxHp = levels[g.levelId].enemyHp;
+            uint16 newHp = uint16(eHp) + uint16(ea.value);
+            eHp = newHp > uint16(maxHp) ? maxHp : uint8(newHp);
         }
 
         emit TurnResolved(msg.sender, dmgDealt, healAmt, pBlock,
-            uint8(ea.actionType), ea.value, dmgTaken, pHp, eHp);
+            uint8(ea.actionType), ea.value, dmgTaken, pHp, eHp, g.enemyBlock);
 
         g.playerHp = pHp;
         g.enemyHp  = eHp;
@@ -444,10 +423,8 @@ contract ChainCards {
 
         // --- Prepare next turn -----------------------------------------------
         for (uint8 i = 0; i < g.handSize; i++) {
-            if (!used[i]) {
-                g.deck[g.deckSize] = g.hand[i];
-                g.deckSize++;
-            }
+            g.deck[g.deckSize] = g.hand[i];
+            g.deckSize++;
         }
 
         g.handSize    = 0;
@@ -616,6 +593,74 @@ contract ChainCards {
     // =====================================================================
     //  Internal helpers
     // =====================================================================
+
+    function _initGame(uint8 levelId, uint8[15] calldata deck) private {
+        require(levelId < NUM_LEVELS, "Invalid level");
+
+        uint8[20] memory counts;
+        for (uint8 i = 0; i < DECK_SIZE; i++) {
+            require(deck[i] < NUM_CARDS, "Invalid card id");
+            counts[deck[i]]++;
+            require(
+                counts[deck[i]] <= cardBalance[msg.sender][deck[i]],
+                "You don't own enough copies of this card"
+            );
+        }
+
+        Game storage g = games[msg.sender];
+        g.levelId     = levelId;
+        g.phase       = Phase.Committed;
+        g.playerHp    = PLAYER_MAX_HP;
+        g.enemyHp     = levels[levelId].enemyHp;
+        g.turn        = 0;
+        g.commitBlock = block.number;
+        g.deckSize    = DECK_SIZE;
+        g.handSize    = 0;
+        g.enemyBlock  = 0;
+        g.enemyBuffed = false;
+
+        for (uint8 i = 0; i < DECK_SIZE; i++) {
+            g.deck[i] = deck[i];
+        }
+
+        emit GameStarted(msg.sender, levelId);
+    }
+
+    function _dealHand(uint256 seed) private {
+        Game storage g = games[msg.sender];
+        uint8 toDeal = g.deckSize < HAND_SIZE ? g.deckSize : HAND_SIZE;
+
+        for (uint8 i = 0; i < toDeal; i++) {
+            uint8 remaining = g.deckSize - i;
+            uint8 j = i + uint8(seed % remaining);
+            seed = uint256(keccak256(abi.encodePacked(seed)));
+            uint8 tmp  = g.deck[i];
+            g.deck[i]  = g.deck[j];
+            g.deck[j]  = tmp;
+        }
+
+        for (uint8 i = 0; i < toDeal; i++) {
+            g.hand[i] = g.deck[i];
+        }
+        g.handSize = toDeal;
+
+        uint8 newDeckSize = g.deckSize - toDeal;
+        for (uint8 i = 0; i < newDeckSize; i++) {
+            g.deck[i] = g.deck[i + toDeal];
+        }
+        g.deckSize = newDeckSize;
+        g.phase = Phase.Dealt;
+
+        emit HandDealt(
+            msg.sender,
+            toDeal > 0 ? g.hand[0] : 0,
+            toDeal > 1 ? g.hand[1] : 0,
+            toDeal > 2 ? g.hand[2] : 0,
+            toDeal > 3 ? g.hand[3] : 0,
+            toDeal > 4 ? g.hand[4] : 0,
+            toDeal
+        );
+    }
 
     function _clearGame(address player) private {
         delete games[player];

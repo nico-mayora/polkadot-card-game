@@ -20,7 +20,6 @@ Players can put up their cards for trade on the blockchain, for either another c
 - Create a single smart contract with all on-chain logic using Solidity.
 - Code the game as a static javascript file hosted on `dot.li`.
 - Call the smart contract from JS using PAPI.
-- Store trade offers on the bulletin chain. They are lost if not fulfilled within 14 days or when completed.
 - Create scenarios that show the smart contract blocks "cheating" attempts.
 
 # Other remarks
@@ -47,16 +46,15 @@ Log in? How do I sign transactions?
     - Make the AI more complex.
     - Keep the scope limited. I don't want this to blow up into the next MTG or anything.
 - ~BUG: Forefeit game but cancel transaction: stuck on game one can't exit.~
-- Once bulletin is used, verify escrowed cards are returned to its owner once the offer expires.
 
 ## Meat of the Issue
 These are goals we must hit, our 'North Star'
 - Deploy on Paseo AssetHub chain
 - Use the new Polkadot Triangle UX
     - Sign transactions with PWallet (https://app.dotsamalabs.com, replaces Talisman)
-    - Dotli NS
+        - PWAllet is currently not working, so this isn't a necessary requirement anymore
+    - Dotli NS (use template GitHub action to deploy)
     - Bulletin chain
-
-## Session:
-claude --resume 563af36c-a147-496a-bc1e-82ad47356895
-
+        - For card storage.
+        - Create a script that pushes the cards to the chain IF NOT ALREADY THERE (to avoid duplicates).
+        - Don't worry about renewal yet.

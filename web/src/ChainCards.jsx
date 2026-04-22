@@ -7,9 +7,9 @@ import {
   commitPack as contractCommitPack,
   openPack as contractOpenPack,
   watchPackOpened,
-  commitDeck as contractCommitDeck,
+  commitDeckAndDeal as contractCommitDeckAndDeal,
   dealHand as contractDealHand,
-  playCards as contractPlayCards,
+  playAndDeal as contractPlayAndDeal,
   forfeitGame as contractForfeitGame,
   createTrade as contractCreateTrade,
   cancelTrade as contractCancelTrade,
@@ -26,7 +26,7 @@ import {
 
 // ─── Card type constants ──────────────────────────────────────────────
 const CT_ATTACK = 0, CT_BLOCK = 1, CT_HEAL = 2, CT_SMITE = 3, CT_DRAIN = 4;
-const EA_ATTACK = 0, EA_SHIELD = 1, EA_BUFF = 2;
+const EA_ATTACK = 0, EA_SHIELD = 1, EA_BUFF = 2, EA_REGEN = 3;
 const MANA_PER_TURN = 3;
 
 // ─── Card & Level Data (mirrors the Solidity contract) ───────────────
@@ -64,24 +64,25 @@ const CARD_TYPE_LABEL = [
 const MANA_DOTS = (cost) => "◆".repeat(cost) + "◇".repeat(MANA_PER_TURN - cost);
 
 const LEVELS = [
-  { id: 0, name: "Goblin Camp",   emoji: "👺", hp: 22, actions: [
-    {type:EA_ATTACK,v:6}, {type:EA_SHIELD,v:5}, {type:EA_ATTACK,v:8},
+  { id: 0, name: "Goblin Camp",   emoji: "👺", hp: 40, actions: [
+    {type:EA_ATTACK,v:8}, {type:EA_SHIELD,v:7}, {type:EA_ATTACK,v:10}, {type:EA_REGEN,v:6},
   ]},
-  { id: 1, name: "Dark Forest",   emoji: "🌲", hp: 38, actions: [
-    {type:EA_ATTACK,v:9}, {type:EA_SHIELD,v:7}, {type:EA_BUFF,v:0}, {type:EA_ATTACK,v:11},
+  { id: 1, name: "Dark Forest",   emoji: "🌲", hp: 60, actions: [
+    {type:EA_ATTACK,v:10}, {type:EA_SHIELD,v:9}, {type:EA_BUFF,v:0}, {type:EA_ATTACK,v:14}, {type:EA_REGEN,v:10},
   ]},
-  { id: 2, name: "Dragon's Lair", emoji: "🐉", hp: 55, actions: [
-    {type:EA_ATTACK,v:13}, {type:EA_SHIELD,v:10}, {type:EA_BUFF,v:0}, {type:EA_ATTACK,v:16}, {type:EA_ATTACK,v:10},
+  { id: 2, name: "Dragon's Lair", emoji: "🐉", hp: 90, actions: [
+    {type:EA_ATTACK,v:13}, {type:EA_SHIELD,v:14}, {type:EA_BUFF,v:0}, {type:EA_ATTACK,v:18}, {type:EA_REGEN,v:15}, {type:EA_ATTACK,v:11},
   ]},
 ];
 
 const enemyActionLabel = (ea, buffed) => {
   if (ea.type === EA_ATTACK) {
     const dmg = buffed ? ea.v * 2 : ea.v;
-    return `⚔ Attacks for ${dmg}${buffed ? " (POWERED UP!)" : ""}`;
+    return `⚔ Attacks for ${dmg}${buffed ? " ⚡ POWERED UP!" : ""}`;
   }
   if (ea.type === EA_SHIELD) return `🛡 Shields for ${ea.v}`;
-  return "⚡ Powers up";
+  if (ea.type === EA_BUFF)   return "⚡ Powers up — next attack is doubled!";
+  return `💚 Regens ${ea.v} HP`;
 };
 
 const DECK_SIZE = 15, HAND_SIZE = 5, MAX_PLAY = 3, PLAYER_MAX_HP = 40;
@@ -400,13 +401,7 @@ export default function ChainCardsGame() {
     });
     setScreen("battle");
     try {
-      await contractCommitDeck(selectedLevel, deck);
-      setBattle((prev) => ({
-        ...prev, phase: "dealing",
-        battleLog: [...prev.battleLog, "Dealing hand on-chain..."],
-      }));
-      await waitForNextBlock();
-      const receipt = await contractDealHand();
+      const receipt = await contractCommitDeckAndDeal(selectedLevel, deck);
       const hand = parseHandFromReceipt(receipt, account);
       setBattle((prev) => ({
         ...prev, phase: "play",
@@ -441,7 +436,7 @@ export default function ChainCardsGame() {
     const indices = [...battle.selectedCards];
     setBattle((prev) => ({ ...prev, phase: "resolving", selectedCards: [] }));
     try {
-      const receipt = await contractPlayCards(indices);
+      const receipt = await contractPlayAndDeal(indices);
       const logs = parseReceiptLogs(receipt);
       const turnEv = logs.find((l) => l.eventName === "TurnResolved");
       const endEv  = logs.find((l) => l.eventName === "GameEnded");
@@ -449,7 +444,7 @@ export default function ChainCardsGame() {
       const bLog = [...battle.battleLog];
 
       if (turnEv) {
-        const { dmgDealt, healAmount, blockGained, enemyActionType, enemyActionValue, dmgTaken, playerHp, enemyHp } = turnEv.args;
+        const { dmgDealt, healAmount, blockGained, enemyActionType, enemyActionValue, dmgTaken, playerHp, enemyHp, newEnemyBlock } = turnEv.args;
         const nDmg   = Number(dmgDealt);
         const nHeal  = Number(healAmount);
         const nBlock = Number(blockGained);
@@ -458,8 +453,8 @@ export default function ChainCardsGame() {
         const nTaken = Number(dmgTaken);
         const nPHp   = Number(playerHp);
         const nEHp   = Number(enemyHp);
+        const nEBlock = Number(newEnemyBlock);
 
-        // Player action summary
         const parts = [];
         if (nDmg  > 0) parts.push(`⚔ ${nDmg} dmg to enemy`);
         if (nBlock > 0) parts.push(`🛡 +${nBlock} block`);
@@ -467,32 +462,20 @@ export default function ChainCardsGame() {
         bLog.push(`You: ${parts.join(", ")} → Enemy HP ${nEHp}/${lvl.hp}`);
 
         if (!endEv) {
-          // Enemy action
           if (eaType === EA_ATTACK) {
             bLog.push(`Enemy: ⚔ attacks → you take ${nTaken} dmg${nBlock > 0 && nTaken === 0 ? " (blocked!)" : ""} → HP ${nPHp}/${PLAYER_MAX_HP}`);
           } else if (eaType === EA_SHIELD) {
             bLog.push(`Enemy: 🛡 shields for ${eaVal}`);
+          } else if (eaType === EA_REGEN) {
+            bLog.push(`Enemy: 💚 regens ${eaVal} HP → Enemy HP ${nEHp}/${lvl.hp}`);
           } else {
             bLog.push(`Enemy: ⚡ powers up — next attack is doubled!`);
           }
         }
 
-        // Compute new enemyBlock and enemyBuffed for local state
-        // (enemy block: reset enemy block partially after player attacked through it this turn,
-        //  then enemy may add more; but contract handles this — we just need to reflect for UI)
-        // The contract's new enemyBlock is revealed via the next getGame call on resume,
-        // so we derive it locally: after attacks, eBlock was consumed; if enemy Shielded, it increased.
-        // Simple approach: mirror what the contract does.
-        let newEBlock = battle.enemyBlock;
-        // Player's attacks chipped through it — contract already emits the net result; we just
-        // need to show the current enemy block. Derive: if enemy shielded, add eaVal; otherwise
-        // the contract already persisted the remaining eBlock. We'll set it from the battle
-        // perspective: block was depleted by player attacks (we don't know exact remainder),
-        // then enemy may have added more. Use eaType to update:
-        if (eaType === EA_SHIELD) newEBlock = (battle.enemyBlock > 99 ? 99 : battle.enemyBlock) + eaVal;
-        else newEBlock = 0;  // conservative — player likely hit through it; contract has actual value
-
-        const newEnemyBuffed = eaType === EA_BUFF;
+        const newEnemyBuffed = eaType === EA_BUFF ? true
+          : eaType === EA_ATTACK ? false
+          : battle.enemyBuffed; // persist buff through non-attack turns
 
         if (endEv) {
           const won = endEv.args.won;
@@ -500,29 +483,22 @@ export default function ChainCardsGame() {
           setBattle((prev) => ({
             ...prev, phase: won ? "won" : "lost",
             playerHp: nPHp, enemyHp: nEHp,
-            enemyBlock: 0, enemyBuffed: false,
-            battleLog: bLog,
+            enemyBlock: 0, enemyBuffed: false, battleLog: bLog,
           }));
           addLog(won ? `🏆 Won at ${lvl.name}!` : `💀 Lost at ${lvl.name}`);
           getCollection(account).then((c) => setCollection(c.map(Number)));
         } else {
-          const unplayed = battle.handSize - indices.length;
+          // Hand was dealt in the same tx — parse it from the same receipt
+          const hand = parseHandFromReceipt(receipt, account);
           bLog.push(`--- Turn ${battle.turn + 2} ---`);
           setBattle((prev) => ({
-            ...prev, phase: "dealing",
-            playerHp: nPHp, enemyHp: nEHp,
-            enemyBlock: newEBlock, enemyBuffed: newEnemyBuffed,
-            turn: prev.turn + 1, deckSize: prev.deckSize + unplayed,
-            battleLog: bLog,
-          }));
-          await waitForNextBlock();
-          const dealReceipt = await contractDealHand();
-          const hand = parseHandFromReceipt(dealReceipt, account);
-          setBattle((prev) => ({
             ...prev, phase: "play",
+            playerHp: nPHp, enemyHp: nEHp,
+            enemyBlock: nEBlock, enemyBuffed: newEnemyBuffed,
+            turn: prev.turn + 1,
             hand, handSize: hand.length,
-            deckSize: prev.deckSize - hand.length,
-            selectedCards: [],
+            deckSize: prev.deckSize + prev.handSize - hand.length,
+            selectedCards: [], battleLog: bLog,
           }));
         }
       }
@@ -850,7 +826,7 @@ export default function ChainCardsGame() {
                 <div style={{ fontSize: 13, color: G.parchDim, fontStyle: "italic" }}>HP: {l.hp}</div>
                 <div style={{ fontSize: 11, color: G.woodLight, marginTop: 4, lineHeight: 1.6 }}>
                   {l.actions.map((a, i) => {
-                    const lbl = a.type === EA_ATTACK ? `⚔${a.v}` : a.type === EA_SHIELD ? `🛡${a.v}` : "⚡BUFF";
+                    const lbl = a.type === EA_ATTACK ? `⚔${a.v}` : a.type === EA_SHIELD ? `🛡${a.v}` : a.type === EA_REGEN ? `💚${a.v}` : "⚡BUFF";
                     return <span key={i}>{i>0?" · ":""}{lbl}</span>;
                   })}
                 </div>

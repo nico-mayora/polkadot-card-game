@@ -21,7 +21,7 @@ export const publicClient = createPublicClient({
 const LOCAL_CHAIN = {
   id: 31337,
   name: "Card Game Local",
-  nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 10 },
+  nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 16 },
   rpcUrls: { default: { http: [RPC_URL] } },
 };
 
@@ -42,7 +42,7 @@ export async function ensureLocalNetwork() {
         params: [{
           chainId: "0x7A69",
           chainName: "Card Game Local",
-          nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 10 },
+          nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 16 },
           rpcUrls: ["http://127.0.0.1:8545"],
         }],
       });
@@ -97,7 +97,7 @@ async function sendTx(functionName: string, args?: unknown[], value?: bigint) {
     value,
     gas: 500_000n,
   } as any);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 1_000 });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 400 });
   await waitForNonceIncrease(address, nonceBefore);
   return receipt;
 }
@@ -146,10 +146,16 @@ export const openPack = () => sendTx("openPack");
 export const commitDeck = (levelId: number, deck: number[]) =>
   sendTx("commitDeck", [levelId, deck]);
 
+export const commitDeckAndDeal = (levelId: number, deck: number[]) =>
+  sendTx("commitDeckAndDeal", [levelId, deck]);
+
 export const dealHand = () => sendTx("dealHand");
 
 export const playCards = (handIndices: number[]) =>
   sendTx("playCards", [handIndices]);
+
+export const playAndDeal = (handIndices: number[]) =>
+  sendTx("playAndDeal", [handIndices]);
 
 export const forfeitGame = () => sendTx("forfeitGame");
 
