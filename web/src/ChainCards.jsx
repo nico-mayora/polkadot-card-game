@@ -24,45 +24,72 @@ import {
   parseReceiptLogs,
 } from "./hooks/useContract";
 
+// ─── Card type constants ──────────────────────────────────────────────
+const CT_ATTACK = 0, CT_BLOCK = 1, CT_HEAL = 2, CT_SMITE = 3, CT_DRAIN = 4;
+const EA_ATTACK = 0, EA_SHIELD = 1, EA_BUFF = 2;
+const MANA_PER_TURN = 3;
+
 // ─── Card & Level Data (mirrors the Solidity contract) ───────────────
 const CARD_DEFS = [
-  { id: 0,  name: "Ember Sprite",    atk: 6,  def: 2,  color: "#e85d3a" },
-  { id: 1,  name: "Stone Golem",     atk: 2,  def: 7,  color: "#8b8b7a" },
-  { id: 2,  name: "Shadow Blade",    atk: 7,  def: 1,  color: "#6b3fa0" },
-  { id: 3,  name: "Iron Shield",     atk: 1,  def: 8,  color: "#7a8e9e" },
-  { id: 4,  name: "Fire Drake",      atk: 8,  def: 3,  color: "#d44a1a" },
-  { id: 5,  name: "Frost Warden",    atk: 3,  def: 6,  color: "#4a9ad4" },
-  { id: 6,  name: "Thunder Strike",  atk: 9,  def: 1,  color: "#d4c74a" },
-  { id: 7,  name: "Earth Guardian",  atk: 2,  def: 8,  color: "#5a7a3a" },
-  { id: 8,  name: "Wind Runner",     atk: 5,  def: 4,  color: "#7acaaa" },
-  { id: 9,  name: "Crystal Mage",    atk: 6,  def: 5,  color: "#aa5ad4" },
-  { id: 10, name: "Void Walker",     atk: 7,  def: 3,  color: "#3a1a5a" },
-  { id: 11, name: "Light Paladin",   atk: 4,  def: 7,  color: "#dac060" },
-  { id: 12, name: "Dark Assassin",   atk: 8,  def: 2,  color: "#2a2a3a" },
-  { id: 13, name: "Water Elemental", atk: 5,  def: 5,  color: "#2a7aba" },
-  { id: 14, name: "Flame Phoenix",   atk: 9,  def: 2,  color: "#ea6a0a" },
-  { id: 15, name: "Ancient Turtle",  atk: 1,  def: 9,  color: "#3a6a4a" },
-  { id: 16, name: "Storm Giant",     atk: 7,  def: 4,  color: "#5a6a9a" },
-  { id: 17, name: "Mystic Healer",   atk: 3,  def: 7,  color: "#ba7aea" },
-  { id: 18, name: "Chaos Dragon",    atk: 10, def: 1,  color: "#1a0a2a" },
-  { id: 19, name: "Divine Angel",    atk: 5,  def: 6,  color: "#eaeaca" },
+  { id: 0,  name: "Quick Strike",    type: CT_ATTACK, value: 6,  cost: 1, color: "#e85d3a" },
+  { id: 1,  name: "Fortify",         type: CT_BLOCK,  value: 7,  cost: 2, color: "#8b8b7a" },
+  { id: 2,  name: "Power Swing",     type: CT_ATTACK, value: 10, cost: 2, color: "#6b3fa0" },
+  { id: 3,  name: "Bulwark",         type: CT_BLOCK,  value: 11, cost: 3, color: "#7a8e9e" },
+  { id: 4,  name: "Heavy Blow",      type: CT_ATTACK, value: 12, cost: 2, color: "#d44a1a" },
+  { id: 5,  name: "Guard",           type: CT_BLOCK,  value: 5,  cost: 1, color: "#4a9ad4" },
+  { id: 6,  name: "Shatter",         type: CT_ATTACK, value: 14, cost: 3, color: "#d4c74a" },
+  { id: 7,  name: "Steel Wall",      type: CT_BLOCK,  value: 9,  cost: 2, color: "#5a7a3a" },
+  { id: 8,  name: "Bandage",         type: CT_HEAL,   value: 5,  cost: 1, color: "#7acaaa" },
+  { id: 9,  name: "Life Tap",        type: CT_DRAIN,  value: 7,  cost: 2, color: "#aa5ad4" },
+  { id: 10, name: "Stab",            type: CT_ATTACK, value: 7,  cost: 1, color: "#3a1a5a" },
+  { id: 11, name: "Mend",            type: CT_HEAL,   value: 7,  cost: 1, color: "#dac060" },
+  { id: 12, name: "Assassinate",     type: CT_SMITE,  value: 10, cost: 2, color: "#2a2a3a" },
+  { id: 13, name: "Recover",         type: CT_HEAL,   value: 10, cost: 2, color: "#2a7aba" },
+  { id: 14, name: "Soul Rend",       type: CT_DRAIN,  value: 10, cost: 3, color: "#ea6a0a" },
+  { id: 15, name: "Unbreakable",     type: CT_BLOCK,  value: 14, cost: 3, color: "#3a6a4a" },
+  { id: 16, name: "Battle Cry",      type: CT_ATTACK, value: 11, cost: 2, color: "#5a6a9a" },
+  { id: 17, name: "Restoration",     type: CT_HEAL,   value: 13, cost: 3, color: "#ba7aea" },
+  { id: 18, name: "Annihilate",      type: CT_ATTACK, value: 18, cost: 3, color: "#1a0a2a" },
+  { id: 19, name: "Divine Blessing", type: CT_HEAL,   value: 16, cost: 3, color: "#eaeaca" },
 ];
+
+const CARD_TYPE_LABEL = [
+  (v) => `⚔ ${v} DMG`,
+  (v) => `🛡 +${v}`,
+  (v) => `💚 +${v} HP`,
+  (v) => `🗡 ${v} PIERCE`,
+  (v) => `🩸 ${v} dmg +${Math.floor(v/2)} hp`,
+];
+
+const MANA_DOTS = (cost) => "◆".repeat(cost) + "◇".repeat(MANA_PER_TURN - cost);
 
 const LEVELS = [
-  { id: 0, name: "Goblin Camp",   emoji: "👺", hp: 20, actions: [{a:4,d:1},{a:3,d:2},{a:5,d:0}] },
-  { id: 1, name: "Dark Forest",   emoji: "🌲", hp: 35, actions: [{a:6,d:3},{a:5,d:4},{a:8,d:2},{a:4,d:5}] },
-  { id: 2, name: "Dragon's Lair", emoji: "🐉", hp: 50, actions: [{a:8,d:4},{a:10,d:2},{a:6,d:6},{a:12,d:3},{a:7,d:5}] },
+  { id: 0, name: "Goblin Camp",   emoji: "👺", hp: 22, actions: [
+    {type:EA_ATTACK,v:6}, {type:EA_SHIELD,v:5}, {type:EA_ATTACK,v:8},
+  ]},
+  { id: 1, name: "Dark Forest",   emoji: "🌲", hp: 38, actions: [
+    {type:EA_ATTACK,v:9}, {type:EA_SHIELD,v:7}, {type:EA_BUFF,v:0}, {type:EA_ATTACK,v:11},
+  ]},
+  { id: 2, name: "Dragon's Lair", emoji: "🐉", hp: 55, actions: [
+    {type:EA_ATTACK,v:13}, {type:EA_SHIELD,v:10}, {type:EA_BUFF,v:0}, {type:EA_ATTACK,v:16}, {type:EA_ATTACK,v:10},
+  ]},
 ];
 
-const DECK_SIZE = 15, HAND_SIZE = 5, MAX_PLAY = 3, PLAYER_MAX_HP = 30;
+const enemyActionLabel = (ea, buffed) => {
+  if (ea.type === EA_ATTACK) {
+    const dmg = buffed ? ea.v * 2 : ea.v;
+    return `⚔ Attacks for ${dmg}${buffed ? " (POWERED UP!)" : ""}`;
+  }
+  if (ea.type === EA_SHIELD) return `🛡 Shields for ${ea.v}`;
+  return "⚡ Powers up";
+};
 
-// ─── Parse HandDealt event from a tx receipt ─────────────────────────────────
+const DECK_SIZE = 15, HAND_SIZE = 5, MAX_PLAY = 3, PLAYER_MAX_HP = 40;
+
 function parseHandFromReceipt(receipt, account) {
   const logs = parseReceiptLogs(receipt);
   const ev = logs.find(
-    (l) =>
-      l.eventName === "HandDealt" &&
-      l.args?.player?.toLowerCase() === account?.toLowerCase()
+    (l) => l.eventName === "HandDealt" && l.args?.player?.toLowerCase() === account?.toLowerCase()
   );
   if (!ev) throw new Error("HandDealt event not found in receipt");
   const { h0, h1, h2, h3, h4, handSize } = ev.args;
@@ -91,6 +118,16 @@ function Card({ cardId, selected, onClick, small, played, count, dimmed }) {
         : "2px 4px 10px rgba(0,0,0,0.7)",
       fontFamily: "'Crimson Pro', Georgia, serif",
     }}>
+      {/* mana cost badge */}
+      <div style={{
+        position: "absolute", top: -8, left: -8,
+        background: c.cost === 1 ? "#2a4a8a" : c.cost === 2 ? "#1a3a6a" : "#0a1a4a",
+        border: "1px solid #4a7adf",
+        color: "#9ab8ff", borderRadius: "50%",
+        width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 700,
+        fontFamily: "monospace",
+      }}>{c.cost}</div>
       {count > 1 && (
         <div style={{
           position: "absolute", top: -8, right: -8,
@@ -110,16 +147,41 @@ function Card({ cardId, selected, onClick, small, played, count, dimmed }) {
         fontSize: small ? 30 : 38, textAlign: "center", margin: "2px 0",
         filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.7))",
       }}>
-        {["🔥","🪨","🗡️","🛡️","🐲","❄️","⚡","🌿","💨","🔮",
-          "🌀","☀️","🌑","🌊","🦅","🐢","🌩️","✨","💀","👼"][cardId]}
+        {[
+          "⚡",   //  0 Quick Strike
+          "🏰",  //  1 Fortify
+          "🪓",  //  2 Power Swing
+          "🛡️", //  3 Bulwark
+          "🔨",  //  4 Heavy Blow
+          "🔰",  //  5 Guard
+          "💥",  //  6 Shatter
+          "🧱",  //  7 Steel Wall
+          "🩹",  //  8 Bandage
+          "🩸",  //  9 Life Tap
+          "🗡️", // 10 Stab
+          "🌿",  // 11 Mend
+          "🌑",  // 12 Assassinate
+          "🍃",  // 13 Recover
+          "🌀",  // 14 Soul Rend
+          "⛰️", // 15 Unbreakable
+          "⚔️", // 16 Battle Cry
+          "✨",  // 17 Restoration
+          "💀",  // 18 Annihilate
+          "☀️", // 19 Divine Blessing
+        ][cardId]}
       </div>
       <div style={{
-        display: "flex", justifyContent: "space-between",
-        fontSize: small ? 11 : 13, fontWeight: 600,
-        background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 5px",
+        fontSize: small ? 10 : 12, fontWeight: 600, textAlign: "center",
+        background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 4px",
+        color: [
+          "#ff8a6b",  // attack
+          "#8ab8ff",  // block
+          "#6aff8a",  // heal
+          "#ff6aff",  // smite
+          "#ffaa6a",  // drain
+        ][c.type],
       }}>
-        <span style={{ color: "#ff8a6b" }}>⚔ {c.atk}</span>
-        <span style={{ color: "#8ab8ff" }}>🛡 {c.def}</span>
+        {CARD_TYPE_LABEL[c.type](c.value)}
       </div>
     </div>
   );
@@ -135,13 +197,11 @@ export default function ChainCardsGame() {
   const [log, setLog] = useState([]);
   const logRef = useRef(null);
 
-  // Connect wallet
   useEffect(() => {
     window.ethereum?.request({ method: "eth_requestAccounts" })
       .then(([addr]) => setAccount(addr));
   }, []);
 
-  // Load on-chain state when account is available
   useEffect(() => {
     if (!account) return;
     getCollection(account).then((counts) => setCollection(counts.map(Number)));
@@ -154,12 +214,11 @@ export default function ChainCardsGame() {
     });
   }, [account]);
 
-  // Resume active game on load
   useEffect(() => {
     if (!account) return;
     contractGetGame(account)
       .then((result) => {
-        const [levelId, phase, playerHp, enemyHp, turn, deckSize, hand, handSize] = result;
+        const [levelId, phase, playerHp, enemyHp, turn, deckSize, hand, handSize, enemyBlock, enemyBuffed] = result;
         const phaseNum = Number(phase);
         if (phaseNum === 0) return;
         const lvl = LEVELS[Number(levelId)];
@@ -170,6 +229,7 @@ export default function ChainCardsGame() {
           level: Number(levelId), playerHp: Number(playerHp), enemyHp: Number(enemyHp),
           turn: Number(turn), deckSize: Number(deckSize),
           hand: handCards, handSize: size,
+          enemyBlock: Number(enemyBlock), enemyBuffed: Boolean(enemyBuffed),
           selectedCards: [], phase: isDealt ? "play" : "dealing",
           battleLog: [`Resumed vs ${lvl.name} — Turn ${Number(turn) + 1}`],
         });
@@ -196,7 +256,6 @@ export default function ChainCardsGame() {
       .catch(() => {});
   }, [account]);
 
-  // Watch pack-opened events to refresh collection and balance
   useEffect(() => {
     if (!account) return;
     const unwatch = watchPackOpened((player) => {
@@ -227,20 +286,14 @@ export default function ChainCardsGame() {
     if (account) localStorage.setItem(`deck:${account}`, JSON.stringify(deck));
   }, [deck, account]);
 
-  // Reload deck when account switches
   useEffect(() => {
     if (!account) return;
     try { setDeck(JSON.parse(localStorage.getItem(`deck:${account}`) ?? "[]")); } catch { setDeck([]); }
   }, [account]);
 
-  // Battle state — phase: "committing"|"dealing"|"play"|"resolving"|"forfeiting"|"won"|"lost"
   const [battle, setBattle] = useState(null);
-
-  // Shop — packState: "idle"|"committing"|"committed"|"opening"
   const [packState, setPackState] = useState("idle");
   const [packResult, setPackResult] = useState(null);
-
-  // Trade
   const [trades, setTrades] = useState([]);
   const [tradeForm, setTradeForm] = useState({ cardId: 0, wantsCard: false, wantedCardId: 0, price: 50 });
   const [tradePending, setTradePending] = useState(false);
@@ -322,7 +375,6 @@ export default function ChainCardsGame() {
     }
   };
 
-  // Cards in deck that exceed current collection (e.g. traded away)
   const deckInvalid = (() => {
     const counts = {};
     for (const id of deck) counts[id] = (counts[id] ?? 0) + 1;
@@ -342,6 +394,7 @@ export default function ChainCardsGame() {
     setBattle({
       level: selectedLevel, playerHp: PLAYER_MAX_HP, enemyHp: lvl.hp,
       turn: 0, deckSize: DECK_SIZE, hand: [], handSize: 0,
+      enemyBlock: 0, enemyBuffed: false,
       selectedCards: [], phase: "committing",
       battleLog: [`⚔️ Starting vs ${lvl.name} — committing deck...`],
     });
@@ -373,12 +426,13 @@ export default function ChainCardsGame() {
   const toggleBattleCard = (idx) => {
     if (!battle || battle.phase !== "play") return;
     setBattle((prev) => {
-      const sel = prev.selectedCards.includes(idx)
-        ? prev.selectedCards.filter((i) => i !== idx)
-        : prev.selectedCards.length < MAX_PLAY
-          ? [...prev.selectedCards, idx]
-          : prev.selectedCards;
-      return { ...prev, selectedCards: sel };
+      if (prev.selectedCards.includes(idx)) {
+        return { ...prev, selectedCards: prev.selectedCards.filter((i) => i !== idx) };
+      }
+      const usedMana = prev.selectedCards.reduce((s, i) => s + CARD_DEFS[prev.hand[i]].cost, 0);
+      const cardCost = CARD_DEFS[prev.hand[idx]].cost;
+      if (usedMana + cardCost > MANA_PER_TURN) return prev;
+      return { ...prev, selectedCards: [...prev.selectedCards, idx] };
     });
   };
 
@@ -390,36 +444,74 @@ export default function ChainCardsGame() {
       const receipt = await contractPlayCards(indices);
       const logs = parseReceiptLogs(receipt);
       const turnEv = logs.find((l) => l.eventName === "TurnResolved");
-      const endEv = logs.find((l) => l.eventName === "GameEnded");
+      const endEv  = logs.find((l) => l.eventName === "GameEnded");
       const lvl = LEVELS[battle.level];
       const bLog = [...battle.battleLog];
 
       if (turnEv) {
-        const { playerAtk, playerDef, enemyAtk, enemyDef, playerHp, enemyHp } = turnEv.args;
-        const dmgToEnemy = Math.max(0, Number(playerAtk) - Number(enemyDef));
-        const dmgToPlayer = Math.max(0, Number(enemyAtk) - Number(playerDef));
-        bLog.push(`Played ${indices.length} card(s): ⚔${playerAtk} 🛡${playerDef}`);
-        bLog.push(`→ Deal ${dmgToEnemy} dmg to enemy. Enemy HP: ${enemyHp}`);
+        const { dmgDealt, healAmount, blockGained, enemyActionType, enemyActionValue, dmgTaken, playerHp, enemyHp } = turnEv.args;
+        const nDmg   = Number(dmgDealt);
+        const nHeal  = Number(healAmount);
+        const nBlock = Number(blockGained);
+        const eaType = Number(enemyActionType);
+        const eaVal  = Number(enemyActionValue);
+        const nTaken = Number(dmgTaken);
+        const nPHp   = Number(playerHp);
+        const nEHp   = Number(enemyHp);
+
+        // Player action summary
+        const parts = [];
+        if (nDmg  > 0) parts.push(`⚔ ${nDmg} dmg to enemy`);
+        if (nBlock > 0) parts.push(`🛡 +${nBlock} block`);
+        if (nHeal  > 0) parts.push(`💚 +${nHeal} HP`);
+        bLog.push(`You: ${parts.join(", ")} → Enemy HP ${nEHp}/${lvl.hp}`);
+
         if (!endEv) {
-          bLog.push(`← Enemy attacks for ${enemyAtk} (blocked ${Math.min(Number(playerDef), Number(enemyAtk))}). You take ${dmgToPlayer}. HP: ${playerHp}`);
+          // Enemy action
+          if (eaType === EA_ATTACK) {
+            bLog.push(`Enemy: ⚔ attacks → you take ${nTaken} dmg${nBlock > 0 && nTaken === 0 ? " (blocked!)" : ""} → HP ${nPHp}/${PLAYER_MAX_HP}`);
+          } else if (eaType === EA_SHIELD) {
+            bLog.push(`Enemy: 🛡 shields for ${eaVal}`);
+          } else {
+            bLog.push(`Enemy: ⚡ powers up — next attack is doubled!`);
+          }
         }
+
+        // Compute new enemyBlock and enemyBuffed for local state
+        // (enemy block: reset enemy block partially after player attacked through it this turn,
+        //  then enemy may add more; but contract handles this — we just need to reflect for UI)
+        // The contract's new enemyBlock is revealed via the next getGame call on resume,
+        // so we derive it locally: after attacks, eBlock was consumed; if enemy Shielded, it increased.
+        // Simple approach: mirror what the contract does.
+        let newEBlock = battle.enemyBlock;
+        // Player's attacks chipped through it — contract already emits the net result; we just
+        // need to show the current enemy block. Derive: if enemy shielded, add eaVal; otherwise
+        // the contract already persisted the remaining eBlock. We'll set it from the battle
+        // perspective: block was depleted by player attacks (we don't know exact remainder),
+        // then enemy may have added more. Use eaType to update:
+        if (eaType === EA_SHIELD) newEBlock = (battle.enemyBlock > 99 ? 99 : battle.enemyBlock) + eaVal;
+        else newEBlock = 0;  // conservative — player likely hit through it; contract has actual value
+
+        const newEnemyBuffed = eaType === EA_BUFF;
 
         if (endEv) {
           const won = endEv.args.won;
           bLog.push(won ? "🏆 VICTORY!" : "💀 DEFEAT.");
           setBattle((prev) => ({
             ...prev, phase: won ? "won" : "lost",
-            playerHp: Number(playerHp), enemyHp: Number(enemyHp), battleLog: bLog,
+            playerHp: nPHp, enemyHp: nEHp,
+            enemyBlock: 0, enemyBuffed: false,
+            battleLog: bLog,
           }));
           addLog(won ? `🏆 Won at ${lvl.name}!` : `💀 Lost at ${lvl.name}`);
           getCollection(account).then((c) => setCollection(c.map(Number)));
         } else {
-          // Unplayed cards return to deck — track rough deck size
           const unplayed = battle.handSize - indices.length;
           bLog.push(`--- Turn ${battle.turn + 2} ---`);
           setBattle((prev) => ({
             ...prev, phase: "dealing",
-            playerHp: Number(playerHp), enemyHp: Number(enemyHp),
+            playerHp: nPHp, enemyHp: nEHp,
+            enemyBlock: newEBlock, enemyBuffed: newEnemyBuffed,
             turn: prev.turn + 1, deckSize: prev.deckSize + unplayed,
             battleLog: bLog,
           }));
@@ -467,7 +559,6 @@ export default function ChainCardsGame() {
           const wantedCardId  = Number(t.wantedCardId  ?? t[3] ?? 0);
           const tokenPrice    = BigInt(t.tokenPrice    ?? t[4] ?? 0);
           const active        = t.active       ?? t[6] ?? false;
-          console.debug("trade", String(id), { seller, offeredCardId, wantsCard, wantedCardId, tokenPrice: tokenPrice.toString(), active });
           return { id, seller, offeredCardId, wantsCard, wantedCardId, tokenPrice, active };
         })
       );
@@ -546,11 +637,7 @@ export default function ChainCardsGame() {
   };
 
   const sty = {
-    page: {
-      minHeight: "100vh",
-      color: G.parchment,
-      fontFamily: "'Crimson Pro', Georgia, serif",
-    },
+    page: { minHeight: "100vh", color: G.parchment, fontFamily: "'Crimson Pro', Georgia, serif" },
     header: {
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "14px 28px",
@@ -586,9 +673,7 @@ export default function ChainCardsGame() {
     panel: {
       background: `radial-gradient(ellipse at 50% 0%, ${G.feltLight} 0%, ${G.felt} 60%, #080e08 100%)`,
       border: `3px solid ${G.woodLight}`,
-      borderRadius: 10,
-      padding: "20px",
-      margin: "4px 0 16px",
+      borderRadius: 10, padding: "20px", margin: "4px 0 16px",
       boxShadow: `inset 0 2px 12px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.5)`,
     },
     grid: { display: "flex", flexWrap: "wrap", gap: 12 },
@@ -705,9 +790,10 @@ export default function ChainCardsGame() {
         <div style={sty.section}>
           <h2 style={sty.h2}>Welcome to Chain Cards</h2>
           <p style={{ color: G.parchDim, lineHeight: 1.8, maxWidth: 640, fontSize: 16 }}>
-            Collect 20 unique cards, build decks, and battle AI enemies across 3 levels.
-            Card ownership and deck shuffling are handled on-chain — no cheating possible.
-            Buy booster packs with tokens, trade cards with other players, and earn rewards for victories.
+            Collect 20 unique action cards, build a deck, and battle AI enemies across 3 levels.
+            Each card is an action — attack for damage, raise a shield, heal yourself, pierce enemy
+            defences, or drain life. Enemies telegraph their moves, block incoming strikes, and
+            power up for devastating blows. Card ownership and deck shuffling are on-chain.
           </p>
           {!starterClaimed && (
             <p style={{ color: G.gold, marginTop: 16, fontStyle: "italic", fontSize: 15 }}>
@@ -720,6 +806,14 @@ export default function ChainCardsGame() {
               {log.length === 0 && <div style={{ color: G.woodLight, fontStyle: "italic" }}>No activity yet...</div>}
               {log.map((l, i) => <div key={i}>{l.msg}</div>)}
             </div>
+          </div>
+          <div style={{ marginTop: 20, color: G.parchDim, fontSize: 13, lineHeight: 1.8, maxWidth: 540 }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 12, letterSpacing: 1, color: G.gold, marginBottom: 6 }}>CARD TYPES</div>
+            <div>⚔ <b style={{color:"#ff8a6b"}}>Attack</b> — deal damage, reduced by enemy shield</div>
+            <div>🛡 <b style={{color:"#8ab8ff"}}>Block</b> — raise a shield to absorb enemy attacks this turn</div>
+            <div>💚 <b style={{color:"#6aff8a"}}>Heal</b> — restore HP</div>
+            <div>🗡 <b style={{color:"#ff6aff"}}>Smite</b> — deal damage that ignores enemy shield</div>
+            <div>🩸 <b style={{color:"#ffaa6a"}}>Drain</b> — deal damage + steal half as healing</div>
           </div>
         </div>
       )}
@@ -743,7 +837,7 @@ export default function ChainCardsGame() {
           <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
             {LEVELS.map((l) => (
               <div key={l.id} onClick={() => setSelectedLevel(l.id)} style={{
-                padding: "14px 20px", borderRadius: 6, cursor: "pointer", flex: 1, maxWidth: 200,
+                padding: "14px 20px", borderRadius: 6, cursor: "pointer", flex: 1, maxWidth: 220,
                 border: selectedLevel === l.id ? `2px solid ${G.gold}` : `2px solid ${G.woodLight}`,
                 background: selectedLevel === l.id
                   ? `linear-gradient(160deg, ${G.goldDeep}, #2a1204)`
@@ -753,9 +847,12 @@ export default function ChainCardsGame() {
               }}>
                 <div style={{ fontSize: 28 }}>{l.emoji}</div>
                 <div style={{ fontWeight: 700, margin: "4px 0", fontFamily: "'Cinzel', serif", fontSize: 13, color: G.parchment }}>{l.name}</div>
-                <div style={{ fontSize: 13, color: G.parchDim, fontStyle: "italic" }}>Enemy HP: {l.hp}</div>
-                <div style={{ fontSize: 11, color: G.woodLight, marginTop: 4 }}>
-                  {l.actions.map((a) => `${a.a}⚔ ${a.d}🛡`).join(" · ")}
+                <div style={{ fontSize: 13, color: G.parchDim, fontStyle: "italic" }}>HP: {l.hp}</div>
+                <div style={{ fontSize: 11, color: G.woodLight, marginTop: 4, lineHeight: 1.6 }}>
+                  {l.actions.map((a, i) => {
+                    const lbl = a.type === EA_ATTACK ? `⚔${a.v}` : a.type === EA_SHIELD ? `🛡${a.v}` : "⚡BUFF";
+                    return <span key={i}>{i>0?" · ":""}{lbl}</span>;
+                  })}
                 </div>
               </div>
             ))}
@@ -798,10 +895,11 @@ export default function ChainCardsGame() {
               <div style={{ fontSize: 13, color: G.parchDim, marginBottom: 4, fontStyle: "italic" }}>
                 {deck.map((d) => CARD_DEFS[d].name).join(", ")}
               </div>
-              <div style={{ display: "flex", gap: 16, fontSize: 13, color: G.parchDim }}>
-                <span>ATK {deck.reduce((s, d) => s + CARD_DEFS[d].atk, 0)}</span>
-                <span>DEF {deck.reduce((s, d) => s + CARD_DEFS[d].def, 0)}</span>
-                <span>Avg ⚔ {(deck.reduce((s, d) => s + CARD_DEFS[d].atk, 0) / deck.length).toFixed(1)}</span>
+              <div style={{ display: "flex", gap: 16, fontSize: 12, color: G.parchDim }}>
+                <span>⚔ {deck.filter(d=>CARD_DEFS[d].type===CT_ATTACK||CARD_DEFS[d].type===CT_DRAIN||CARD_DEFS[d].type===CT_SMITE).length} dmg</span>
+                <span>🛡 {deck.filter(d=>CARD_DEFS[d].type===CT_BLOCK).length} block</span>
+                <span>💚 {deck.filter(d=>CARD_DEFS[d].type===CT_HEAL||CARD_DEFS[d].type===CT_DRAIN).length} heal</span>
+                <span>◆ avg {(deck.reduce((s,d)=>s+CARD_DEFS[d].cost,0)/deck.length).toFixed(1)} mana</span>
               </div>
             </div>
           )}
@@ -826,6 +924,7 @@ export default function ChainCardsGame() {
         <div style={sty.section}>
           {/* HP bars */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+            {/* Player side */}
             <div>
               <div style={{ fontSize: 12, color: G.parchDim, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'Cinzel', serif" }}>You</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
@@ -835,7 +934,7 @@ export default function ChainCardsGame() {
                 <div style={{ width: 140, height: 8, background: "rgba(0,0,0,0.5)", borderRadius: 4, overflow: "hidden", border: `1px solid ${G.woodLight}` }}>
                   <div style={{
                     width: `${(battle.playerHp / PLAYER_MAX_HP) * 100}%`, height: "100%",
-                    background: battle.playerHp > 15 ? "#4a8a3a" : battle.playerHp > 7 ? "#c9a030" : G.red,
+                    background: battle.playerHp > 20 ? "#4a8a3a" : battle.playerHp > 10 ? "#c9a030" : G.red,
                     transition: "width 0.4s",
                   }} />
                 </div>
@@ -844,9 +943,17 @@ export default function ChainCardsGame() {
                 {battle.deckSize} cards remaining · Turn {battle.turn + 1}
               </div>
             </div>
+
+            {/* Enemy side */}
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, color: G.parchDim, fontFamily: "'Cinzel', serif" }}>
                 {LEVELS[battle.level].emoji} {LEVELS[battle.level].name}
+                {battle.enemyBlock > 0 && (
+                  <span style={{ marginLeft: 8, color: "#8ab8ff", fontSize: 12 }}>🛡 {battle.enemyBlock}</span>
+                )}
+                {battle.enemyBuffed && (
+                  <span style={{ marginLeft: 8, color: "#ffdd44", fontSize: 12 }}>⚡ POWERED</span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
                 <div style={{ width: 140, height: 8, background: "rgba(0,0,0,0.5)", borderRadius: 4, overflow: "hidden", border: `1px solid ${G.woodLight}` }}>
@@ -860,8 +967,13 @@ export default function ChainCardsGame() {
                 </div>
               </div>
               {battle.phase === "play" && (() => {
-                const ea = LEVELS[battle.level].actions[battle.turn % LEVELS[battle.level].actions.length];
-                return <div style={{ fontSize: 12, color: "#c07060", fontStyle: "italic", marginTop: 3 }}>Incoming: ⚔ {ea.a} · 🛡 {ea.d}</div>;
+                const lvl = LEVELS[battle.level];
+                const ea = lvl.actions[battle.turn % lvl.actions.length];
+                return (
+                  <div style={{ fontSize: 12, marginTop: 3, color: ea.type === EA_BUFF ? "#ffdd44" : ea.type === EA_SHIELD ? "#8ab8ff" : "#c07060", fontStyle: "italic" }}>
+                    {enemyActionLabel(ea, battle.enemyBuffed)}
+                  </div>
+                );
               })()}
             </div>
           </div>
@@ -875,10 +987,22 @@ export default function ChainCardsGame() {
           )}
 
           {/* Play phase */}
-          {battle.phase === "play" && (
-            <>
-              <div style={{ fontSize: 14, color: G.parchDim, fontStyle: "italic", marginBottom: 10 }}>
-                Choose up to 3 cards ({battle.selectedCards.length}/3):
+          {battle.phase === "play" && (() => {
+            const usedMana = battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].cost, 0);
+            return (<>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+                <span style={{ fontSize: 13, color: G.parchDim, fontStyle: "italic" }}>
+                  Mana:
+                </span>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: i < usedMana ? "#4a7adf" : "rgba(0,0,0,0.5)",
+                    border: `2px solid ${i < usedMana ? "#8ab8ff" : "#2a3a5a"}`,
+                    transition: "background 0.15s",
+                  }} />
+                ))}
+                <span style={{ fontSize: 12, color: "#9ab8ff" }}>{usedMana}/{MANA_PER_TURN}</span>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
                 {battle.hand.slice(0, battle.handSize).map((cardId, idx) => (
@@ -887,17 +1011,26 @@ export default function ChainCardsGame() {
                     onClick={() => toggleBattleCard(idx)} />
                 ))}
               </div>
-              {battle.selectedCards.length > 0 && (
-                <div style={{ fontSize: 14, color: G.parchDim, marginBottom: 10, fontStyle: "italic" }}>
-                  Combined: ⚔ {battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].atk, 0)}
-                  {" · "} 🛡 {battle.selectedCards.reduce((s, i) => s + CARD_DEFS[battle.hand[i]].def, 0)}
-                </div>
-              )}
+              {battle.selectedCards.length > 0 && (() => {
+                const selCards = battle.selectedCards.map(i => CARD_DEFS[battle.hand[i]]);
+                const totalDmg = selCards.filter(c=>c.type===CT_ATTACK||c.type===CT_DRAIN||c.type===CT_SMITE).reduce((s,c)=>s+c.value,0);
+                const totalBlock = selCards.filter(c=>c.type===CT_BLOCK).reduce((s,c)=>s+c.value,0);
+                const totalHeal = selCards.filter(c=>c.type===CT_HEAL).reduce((s,c)=>s+c.value,0) + selCards.filter(c=>c.type===CT_DRAIN).reduce((s,c)=>s+Math.floor(c.value/2),0);
+                const parts = [];
+                if (totalDmg > 0)  parts.push(`⚔ ${totalDmg} dmg`);
+                if (totalBlock > 0) parts.push(`🛡 +${totalBlock} block`);
+                if (totalHeal > 0)  parts.push(`💚 +${totalHeal} heal`);
+                return (
+                  <div style={{ fontSize: 14, color: G.parchDim, marginBottom: 10, fontStyle: "italic" }}>
+                    This turn: {parts.join(" · ")}
+                  </div>
+                );
+              })()}
               <button onClick={playTurn} disabled={battle.selectedCards.length === 0} style={sty.btn(battle.selectedCards.length === 0)}>
                 Play Cards
               </button>
-            </>
-          )}
+            </>);
+          })()}
 
           {/* End states */}
           {(battle.phase === "won" || battle.phase === "lost") && (

@@ -16,10 +16,10 @@ contract ChainCards {
     uint8  public constant NUM_CARDS       = 20;
     uint8  public constant DECK_SIZE       = 15;
     uint8  public constant HAND_SIZE       = 5;
-    uint8  public constant MAX_PLAY        = 3;
+    uint8  public constant MANA_PER_TURN   = 3;
     uint8  public constant PACK_SIZE       = 3;
     uint8  public constant NUM_LEVELS      = 3;
-    uint8  public constant PLAYER_MAX_HP   = 30;
+    uint8  public constant PLAYER_MAX_HP   = 40;
     uint256 public constant TRADE_DURATION = 14 days;
     uint256 public constant PACK_PRICE = 1 * 10**10; // 1 DOT
 
@@ -27,21 +27,37 @@ contract ChainCards {
     //  Types
     // =====================================================================
 
-    struct CardDef {
-        uint8 attack;
-        uint8 defense;
+    /// @dev Card effect types (Slay-the-Spire style actions).
+    enum CardType {
+        Attack,  // 0 — deal value damage (reduced by enemy block)
+        Block,   // 1 — gain value block this turn
+        Heal,    // 2 — restore value HP
+        Smite,   // 3 — deal value damage ignoring enemy block
+        Drain    // 4 — deal value damage + heal value/2 HP
     }
 
-    /// @dev A single action in an enemy's turn sequence (cycles).
+    struct CardDef {
+        CardType cardType;
+        uint8    value;
+        uint8    cost;   // mana cost: 1, 2, or 3
+    }
+
+    /// @dev Enemy action types.
+    enum EnemyActionType {
+        Attack,  // 0 — deal value damage to the player
+        Shield,  // 1 — gain value block (reduces player damage next turns)
+        Buff     // 2 — next Attack deals double damage
+    }
+
     struct EnemyAction {
-        uint8 attack;
-        uint8 defense;
+        EnemyActionType actionType;
+        uint8           value;
     }
 
     /// @dev Per-level definition stored at deploy time.
     struct LevelDef {
-        uint8  enemyHp;
-        uint8  numActions;           // length of the action cycle
+        uint8 enemyHp;
+        uint8 numActions;
     }
 
     enum Phase { None, Committed, Dealt }
@@ -51,20 +67,22 @@ contract ChainCards {
         Phase   phase;
         uint8   playerHp;
         uint8   enemyHp;
-        uint8   turn;                // current turn (0-indexed)
-        uint256 commitBlock;         // block at which deck/hand was committed
-        uint8   deckSize;            // cards remaining in deck (indices 0..deckSize-1)
-        uint8[15] deck;              // card IDs — first `deckSize` are live
-        uint8[5]  hand;              // current hand (valid entries: 0..handSize-1)
+        uint8   turn;
+        uint256 commitBlock;
+        uint8   deckSize;
+        uint8[15] deck;
+        uint8[5]  hand;
         uint8   handSize;
+        uint8   enemyBlock;   // persists until attacked through
+        bool    enemyBuffed;  // next enemy Attack deals double damage
     }
 
     struct TradeOffer {
         address seller;
         uint8   offeredCardId;
-        bool    wantsCard;           // true  → swap for wantedCardId
-        uint8   wantedCardId;        // only meaningful when wantsCard == true
-        uint256 tokenPrice;          // only meaningful when wantsCard == false
+        bool    wantsCard;
+        uint8   wantedCardId;
+        uint256 tokenPrice;
         uint256 expiresAt;
         bool    active;
     }
@@ -75,31 +93,17 @@ contract ChainCards {
 
     address public owner;
 
-    /// @dev Card catalogue (set once in constructor).
     CardDef[20] public cards;
-
-    /// @dev Level catalogue.
     LevelDef[3] public levels;
 
-    /// @dev Enemy action sequences — enemyActions[level][turn % numActions].
+    /// @dev enemyActions[levelId][actionIndex]
     mapping(uint8 => mapping(uint8 => EnemyAction)) public enemyActions;
 
-    /// @dev Card balances — cardBalance[player][cardId] = count.
     mapping(address => mapping(uint8 => uint256)) public cardBalance;
-
-    /// @dev Active game session per player (one at a time).
     mapping(address => Game) private games;
-
-    /// @dev Whether a player has already claimed the free starter pack.
     mapping(address => bool) public starterClaimed;
-
-    /// @dev Marketplace of trade offers.
     TradeOffer[] public trades;
-
-    /// @dev Booster-pack commit block (two-step randomness).
     mapping(address => uint256) private packCommitBlock;
-
-    /// @dev Incrementing nonce mixed into randomness.
     uint256 private _nonce;
 
     // =====================================================================
@@ -113,12 +117,14 @@ contract ChainCards {
     event HandDealt(address indexed player, uint8 h0, uint8 h1, uint8 h2, uint8 h3, uint8 h4, uint8 handSize);
     event TurnResolved(
         address indexed player,
-        uint8   playerAtk,
-        uint8   playerDef,
-        uint8   enemyAtk,
-        uint8   enemyDef,
-        uint8   playerHp,
-        uint8   enemyHp
+        uint8 dmgDealt,
+        uint8 healAmount,
+        uint8 blockGained,
+        uint8 enemyActionType,
+        uint8 enemyActionValue,
+        uint8 dmgTaken,
+        uint8 playerHp,
+        uint8 enemyHp
     );
     event GameEnded(address indexed player, bool won);
     event TradeCreated(uint256 indexed tradeId, address indexed seller, uint8 offeredCardId);
@@ -126,54 +132,63 @@ contract ChainCards {
     event TradeCancelled(uint256 indexed tradeId);
 
     // =====================================================================
-    //  Constructor — initialise the card & level catalogues
+    //  Constructor — initialise card & level catalogues
     // =====================================================================
 
     constructor() {
         owner = msg.sender;
 
-        // ---- 20 cards (attack, defense) --------------------------------
-        cards[ 0] = CardDef(6, 2);   // Ember Sprite
-        cards[ 1] = CardDef(2, 7);   // Stone Golem
-        cards[ 2] = CardDef(7, 1);   // Shadow Blade
-        cards[ 3] = CardDef(1, 8);   // Iron Shield
-        cards[ 4] = CardDef(8, 3);   // Fire Drake
-        cards[ 5] = CardDef(3, 6);   // Frost Warden
-        cards[ 6] = CardDef(9, 1);   // Thunder Strike
-        cards[ 7] = CardDef(2, 8);   // Earth Guardian
-        cards[ 8] = CardDef(5, 4);   // Wind Runner
-        cards[ 9] = CardDef(6, 5);   // Crystal Mage
-        cards[10] = CardDef(7, 3);   // Void Walker
-        cards[11] = CardDef(4, 7);   // Light Paladin
-        cards[12] = CardDef(8, 2);   // Dark Assassin
-        cards[13] = CardDef(5, 5);   // Water Elemental
-        cards[14] = CardDef(9, 2);   // Flame Phoenix
-        cards[15] = CardDef(1, 9);   // Ancient Turtle
-        cards[16] = CardDef(7, 4);   // Storm Giant
-        cards[17] = CardDef(3, 7);   // Mystic Healer
-        cards[18] = CardDef(10, 1);  // Chaos Dragon
-        cards[19] = CardDef(5, 6);   // Divine Angel
+        // ---- 20 cards: (type, value, mana cost) --------------------------------
+        // Attack — deal damage, reduced by enemy block
+        cards[ 0] = CardDef(CardType.Attack,  6, 1);  // Quick Strike
+        cards[10] = CardDef(CardType.Attack,  7, 1);  // Stab
+        cards[ 2] = CardDef(CardType.Attack, 10, 2);  // Power Swing
+        cards[16] = CardDef(CardType.Attack, 11, 2);  // Battle Cry
+        cards[ 4] = CardDef(CardType.Attack, 12, 2);  // Heavy Blow
+        cards[ 6] = CardDef(CardType.Attack, 14, 3);  // Shatter
+        cards[18] = CardDef(CardType.Attack, 18, 3);  // Annihilate
 
-        // ---- Level 0: Goblin Camp ------------------------------------
-        levels[0] = LevelDef(20, 3);
-        enemyActions[0][0] = EnemyAction(4, 1);
-        enemyActions[0][1] = EnemyAction(3, 2);
-        enemyActions[0][2] = EnemyAction(5, 0);
+        // Block — gain block to absorb enemy attack this turn
+        cards[ 5] = CardDef(CardType.Block,  5, 1);   // Guard
+        cards[ 1] = CardDef(CardType.Block,  7, 2);   // Fortify
+        cards[ 7] = CardDef(CardType.Block,  9, 2);   // Steel Wall
+        cards[ 3] = CardDef(CardType.Block, 11, 3);   // Bulwark
+        cards[15] = CardDef(CardType.Block, 14, 3);   // Unbreakable
 
-        // ---- Level 1: Dark Forest ------------------------------------
-        levels[1] = LevelDef(35, 4);
-        enemyActions[1][0] = EnemyAction(6, 3);
-        enemyActions[1][1] = EnemyAction(5, 4);
-        enemyActions[1][2] = EnemyAction(8, 2);
-        enemyActions[1][3] = EnemyAction(4, 5);
+        // Heal — restore HP
+        cards[ 8] = CardDef(CardType.Heal,  5, 1);    // Bandage
+        cards[11] = CardDef(CardType.Heal,  7, 1);    // Mend
+        cards[13] = CardDef(CardType.Heal, 10, 2);    // Recover
+        cards[17] = CardDef(CardType.Heal, 13, 3);    // Restoration
+        cards[19] = CardDef(CardType.Heal, 16, 3);    // Divine Blessing
 
-        // ---- Level 2: Dragon's Lair ----------------------------------
-        levels[2] = LevelDef(50, 5);
-        enemyActions[2][0] = EnemyAction( 8, 4);
-        enemyActions[2][1] = EnemyAction(10, 2);
-        enemyActions[2][2] = EnemyAction( 6, 6);
-        enemyActions[2][3] = EnemyAction(12, 3);
-        enemyActions[2][4] = EnemyAction( 7, 5);
+        // Smite — deal damage ignoring enemy block
+        cards[12] = CardDef(CardType.Smite, 10, 2);   // Assassinate
+
+        // Drain — deal damage + heal value/2 HP
+        cards[ 9] = CardDef(CardType.Drain,  7, 2);   // Life Tap    (7 dmg + 3 heal)
+        cards[14] = CardDef(CardType.Drain, 10, 3);   // Soul Rend   (10 dmg + 5 heal)
+
+        // ---- Level 0: Goblin Camp (HP 22) ------------------------------------
+        levels[0] = LevelDef(22, 3);
+        enemyActions[0][0] = EnemyAction(EnemyActionType.Attack,  6);
+        enemyActions[0][1] = EnemyAction(EnemyActionType.Shield,  5);
+        enemyActions[0][2] = EnemyAction(EnemyActionType.Attack,  8);
+
+        // ---- Level 1: Dark Forest (HP 38) ------------------------------------
+        levels[1] = LevelDef(38, 4);
+        enemyActions[1][0] = EnemyAction(EnemyActionType.Attack,  9);
+        enemyActions[1][1] = EnemyAction(EnemyActionType.Shield,  7);
+        enemyActions[1][2] = EnemyAction(EnemyActionType.Buff,    0);
+        enemyActions[1][3] = EnemyAction(EnemyActionType.Attack, 11);
+
+        // ---- Level 2: Dragon's Lair (HP 55) ----------------------------------
+        levels[2] = LevelDef(55, 5);
+        enemyActions[2][0] = EnemyAction(EnemyActionType.Attack, 13);
+        enemyActions[2][1] = EnemyAction(EnemyActionType.Shield, 10);
+        enemyActions[2][2] = EnemyAction(EnemyActionType.Buff,    0);
+        enemyActions[2][3] = EnemyAction(EnemyActionType.Attack, 16);
+        enemyActions[2][4] = EnemyAction(EnemyActionType.Attack, 10);
     }
 
     // =====================================================================
@@ -194,79 +209,55 @@ contract ChainCards {
     //  Starter Pack
     // =====================================================================
 
-    /// @notice Claim a one-time starter pack: one copy of cards 0-4 and 200 tokens.
     function claimStarterPack() external noActiveGame {
         require(!starterClaimed[msg.sender], "Already claimed");
         starterClaimed[msg.sender] = true;
-
         for (uint8 i = 0; i < 5; i++) {
             cardBalance[msg.sender][i] += 1;
         }
-
         emit StarterClaimed(msg.sender);
     }
 
     // =====================================================================
-    //  Booster Packs (two-step commit / reveal for randomness)
+    //  Booster Packs (two-step commit / reveal)
     // =====================================================================
 
-    /// @notice Step 1 — pay for a booster pack and commit to a future block
-    ///         for randomness. Call `openPack()` in a later block.
     function commitPack() external payable noActiveGame {
         require(msg.value == PACK_PRICE, "Send exactly the pack price");
         require(packCommitBlock[msg.sender] == 0, "Pack already committed");
-
         (bool ok, ) = owner.call{value: msg.value}("");
         require(ok, "Payment failed");
-
         packCommitBlock[msg.sender] = block.number;
         emit PackCommitted(msg.sender);
     }
 
-    /// @notice Step 2 — reveal the booster pack contents. Must be called in a
-    ///         block after `commitPack()` but within 256 blocks (EVM limit for
-    ///         `blockhash`).
     function openPack() external {
         uint256 cb = packCommitBlock[msg.sender];
         require(cb != 0, "No pack committed");
         require(block.number > cb, "Wait for next block");
         require(block.number <= cb + 256, "Commit expired, call commitPack again");
 
-        // Use the blockhash of the commit block as entropy — unknown to the
-        // player at the time they committed.
         uint256 seed = uint256(keccak256(abi.encodePacked(
             blockhash(cb), msg.sender, _nonce++
         )));
-
-        uint8 c0 = uint8(seed % NUM_CARDS);
-        seed = uint256(keccak256(abi.encodePacked(seed)));
-        uint8 c1 = uint8(seed % NUM_CARDS);
-        seed = uint256(keccak256(abi.encodePacked(seed)));
-        uint8 c2 = uint8(seed % NUM_CARDS);
-
-        cardBalance[msg.sender][c0] += 1;
-        cardBalance[msg.sender][c1] += 1;
-        cardBalance[msg.sender][c2] += 1;
-
+        uint8[PACK_SIZE] memory drawn;
+        for (uint8 i = 0; i < PACK_SIZE; i++) {
+            if (i > 0) seed = uint256(keccak256(abi.encodePacked(seed)));
+            drawn[i] = uint8(seed % NUM_CARDS);
+            cardBalance[msg.sender][drawn[i]] += 1;
+        }
         packCommitBlock[msg.sender] = 0;
 
-        emit PackOpened(msg.sender, c0, c1, c2);
+        emit PackOpened(msg.sender, drawn[0], drawn[1], drawn[2]);
     }
 
     // =====================================================================
     //  Game — Commit Deck
     // =====================================================================
 
-    /// @notice Start a game by selecting a level and committing a 15-card deck.
-    ///         The hand will be dealt in a later block via `dealHand()`.
-    /// @param levelId 0, 1, or 2.
-    /// @param deck    Array of 15 card IDs from the player's collection.
     function commitDeck(uint8 levelId, uint8[15] calldata deck) external noActiveGame {
         require(levelId < NUM_LEVELS, "Invalid level");
 
-        // Verify the player owns every card they want to use.
-        // Count occurrences of each card ID in the submitted deck and compare
-        // against the player's balance.
         uint8[20] memory counts;
         for (uint8 i = 0; i < DECK_SIZE; i++) {
             require(deck[i] < NUM_CARDS, "Invalid card id");
@@ -286,6 +277,8 @@ contract ChainCards {
         g.commitBlock = block.number;
         g.deckSize    = DECK_SIZE;
         g.handSize    = 0;
+        g.enemyBlock  = 0;
+        g.enemyBuffed = false;
 
         for (uint8 i = 0; i < DECK_SIZE; i++) {
             g.deck[i] = deck[i];
@@ -298,8 +291,6 @@ contract ChainCards {
     //  Game — Deal Hand
     // =====================================================================
 
-    /// @notice Deal a hand from the committed deck. Must be called in a later
-    ///         block than `commitDeck` (or the previous `playCards`).
     function dealHand() external {
         Game storage g = games[msg.sender];
         require(g.phase == Phase.Committed, "Not in committed phase");
@@ -310,36 +301,27 @@ contract ChainCards {
             blockhash(g.commitBlock), msg.sender, _nonce++
         )));
 
-        // Determine how many cards to deal (min of HAND_SIZE and remaining deck).
         uint8 toDeal = g.deckSize < HAND_SIZE ? g.deckSize : HAND_SIZE;
 
-        // Fisher-Yates partial shuffle: select `toDeal` random cards from the
-        // front of the deck array.
         for (uint8 i = 0; i < toDeal; i++) {
             uint8 remaining = g.deckSize - i;
             uint8 j = i + uint8(seed % remaining);
             seed = uint256(keccak256(abi.encodePacked(seed)));
-
-            // Swap deck[i] and deck[j]
             uint8 tmp  = g.deck[i];
             g.deck[i]  = g.deck[j];
             g.deck[j]  = tmp;
         }
 
-        // The first `toDeal` slots of g.deck are now the hand.
         for (uint8 i = 0; i < toDeal; i++) {
             g.hand[i] = g.deck[i];
         }
         g.handSize = toDeal;
 
-        // Shrink the live deck: the remaining cards start at index `toDeal`.
-        // Compact them to the front.
         uint8 newDeckSize = g.deckSize - toDeal;
         for (uint8 i = 0; i < newDeckSize; i++) {
             g.deck[i] = g.deck[i + toDeal];
         }
         g.deckSize = newDeckSize;
-
         g.phase = Phase.Dealt;
 
         emit HandDealt(
@@ -357,21 +339,26 @@ contract ChainCards {
     //  Game — Play Cards & Resolve Turn
     // =====================================================================
 
-    /// @notice Play up to 3 cards from the current hand. The contract validates
-    ///         that the chosen cards exist in the hand, resolves combat, and
-    ///         either ends the game or prepares for the next turn.
-    /// @param handIndices Indices (0-4) into the hand array, played in order.
-    ///                    Length must be 1–3.
+    /// @notice Play 1–3 cards from the current hand.
+    ///         Cards are processed in order. Attack chips through enemy block;
+    ///         Smite pierces block entirely; Block generates player shield this
+    ///         turn; Heal restores HP; Drain damages + heals.
+    ///         After cards resolve, the enemy takes its turn action.
     function playCards(uint8[] calldata handIndices) external {
         Game storage g = games[msg.sender];
         require(g.phase == Phase.Dealt, "No hand dealt");
-        require(handIndices.length >= 1 && handIndices.length <= MAX_PLAY, "Play 1-3 cards");
+        require(handIndices.length >= 1 && handIndices.length <= g.handSize, "Invalid card count");
 
-        // --- Validate chosen cards are in the hand ----------------------
         bool[5] memory used;
-        uint16 totalAtk;
-        uint16 totalDef;
 
+        // Working copies
+        uint8 pHp      = g.playerHp;
+        uint8 eHp      = g.enemyHp;
+        uint8 eBlock   = g.enemyBlock;
+        uint8 pBlock   = 0;   // generated this turn, used against enemy attack
+        uint8 manaUsed = 0;
+
+        // --- Process player cards -------------------------------------------
         for (uint8 i = 0; i < handIndices.length; i++) {
             uint8 idx = handIndices[i];
             require(idx < g.handSize, "Index out of hand range");
@@ -379,55 +366,83 @@ contract ChainCards {
             used[idx] = true;
 
             CardDef memory c = cards[g.hand[idx]];
-            totalAtk += c.attack;
-            totalDef += c.defense;
+            require(manaUsed + c.cost <= MANA_PER_TURN, "Not enough mana");
+            manaUsed += c.cost;
+
+            if (c.cardType == CardType.Attack) {
+                uint8 blocked = eBlock < c.value ? eBlock : c.value;
+                uint8 dmg     = c.value - blocked;
+                eBlock        = eBlock > c.value ? eBlock - c.value : 0;
+                eHp           = eHp > dmg ? eHp - dmg : 0;
+            } else if (c.cardType == CardType.Smite) {
+                eHp = eHp > c.value ? eHp - c.value : 0;
+            } else if (c.cardType == CardType.Block) {
+                pBlock += c.value;
+            } else if (c.cardType == CardType.Heal) {
+                uint8 space = PLAYER_MAX_HP - pHp;
+                pHp += space < c.value ? space : c.value;
+            } else if (c.cardType == CardType.Drain) {
+                uint8 blocked = eBlock < c.value ? eBlock : c.value;
+                uint8 dmg     = c.value - blocked;
+                eBlock        = eBlock > c.value ? eBlock - c.value : 0;
+                eHp           = eHp > dmg ? eHp - dmg : 0;
+                uint8 heal    = c.value / 2;
+                uint8 space   = PLAYER_MAX_HP - pHp;
+                pHp           += space < heal ? space : heal;
+            }
+
+            if (eHp == 0) break;
         }
 
-        // --- Resolve combat ---------------------------------------------
+        // Save updated enemy block (persists to next turn if not fully depleted)
+        g.enemyBlock = eBlock;
+
+        // Compute deltas for the event (computed before enemy action reduces pHp)
+        uint8 dmgDealt  = g.enemyHp - eHp;
+        uint8 healAmt   = pHp - g.playerHp;
+
+        // --- Check win -------------------------------------------------------
         LevelDef  memory lvl = levels[g.levelId];
         EnemyAction memory ea = enemyActions[g.levelId][g.turn % lvl.numActions];
 
-        // Player attacks enemy
-        uint16 dmgToEnemy = totalAtk > ea.defense ? totalAtk - ea.defense : 0;
-        if (dmgToEnemy >= g.enemyHp) {
-            g.enemyHp = 0;
-        } else {
-            g.enemyHp -= uint8(dmgToEnemy);
-        }
-
-        // Check win
-        if (g.enemyHp == 0) {
-            emit TurnResolved(msg.sender, uint8(totalAtk), uint8(totalDef),
-                ea.attack, ea.defense, g.playerHp, 0);
+        if (eHp == 0) {
+            emit TurnResolved(msg.sender, dmgDealt, healAmt, pBlock,
+                uint8(ea.actionType), ea.value, 0, pHp, 0);
             emit GameEnded(msg.sender, true);
             _clearGame(msg.sender);
             return;
         }
 
-        // Enemy attacks player
-        uint16 dmgToPlayer = ea.attack > totalDef ? ea.attack - uint16(totalDef) : 0;
-        if (dmgToPlayer >= g.playerHp) {
-            g.playerHp = 0;
+        // --- Resolve enemy action --------------------------------------------
+        uint8 dmgTaken = 0;
+
+        if (ea.actionType == EnemyActionType.Attack) {
+            uint8 atkVal  = g.enemyBuffed ? ea.value * 2 : ea.value;
+            uint8 absorbed = pBlock < atkVal ? pBlock : atkVal;
+            uint8 netDmg   = atkVal - absorbed;
+            pHp            = pHp > netDmg ? pHp - netDmg : 0;
+            dmgTaken       = netDmg;
+            g.enemyBuffed  = false;
+        } else if (ea.actionType == EnemyActionType.Shield) {
+            g.enemyBlock += ea.value;
         } else {
-            g.playerHp -= uint8(dmgToPlayer);
+            // Buff
+            g.enemyBuffed = true;
         }
 
-        emit TurnResolved(
-            msg.sender,
-            uint8(totalAtk), uint8(totalDef),
-            ea.attack, ea.defense,
-            g.playerHp, g.enemyHp
-        );
+        emit TurnResolved(msg.sender, dmgDealt, healAmt, pBlock,
+            uint8(ea.actionType), ea.value, dmgTaken, pHp, eHp);
 
-        // Check loss
-        if (g.playerHp == 0) {
+        g.playerHp = pHp;
+        g.enemyHp  = eHp;
+
+        if (pHp == 0) {
             emit GameEnded(msg.sender, false);
             _clearGame(msg.sender);
             return;
         }
 
-        // --- Prepare next turn ------------------------------------------
-        // Return unplayed hand cards to the deck.
+        // --- Prepare next turn -----------------------------------------------
         for (uint8 i = 0; i < g.handSize; i++) {
             if (!used[i]) {
                 g.deck[g.deckSize] = g.hand[i];
@@ -437,11 +452,10 @@ contract ChainCards {
 
         g.handSize    = 0;
         g.turn       += 1;
-        g.commitBlock = block.number;   // new entropy anchor for next deal
+        g.commitBlock = block.number;
         g.phase       = Phase.Committed;
     }
 
-    /// @notice Forfeit the current game.
     function forfeitGame() external {
         require(games[msg.sender].phase != Phase.None, "No active game");
         emit GameEnded(msg.sender, false);
@@ -452,11 +466,6 @@ contract ChainCards {
     //  Trading
     // =====================================================================
 
-    /// @notice Create a trade offer: sell a card for either another card or tokens.
-    /// @param cardId      The card to offer.
-    /// @param wantsCard   True if you want a card in return, false for tokens.
-    /// @param wantedCardId The card you want (ignored if wantsCard is false).
-    /// @param tokenPrice  The token price (ignored if wantsCard is true).
     function createTrade(
         uint8   cardId,
         bool    wantsCard,
@@ -467,7 +476,6 @@ contract ChainCards {
         require(cardBalance[msg.sender][cardId] >= 1, "You don't own this card");
         if (wantsCard) require(wantedCardId < NUM_CARDS, "Invalid wanted card");
 
-        // Escrow: take the card from the seller so it can't be double-spent.
         cardBalance[msg.sender][cardId] -= 1;
 
         uint256 tradeId = trades.length;
@@ -484,18 +492,15 @@ contract ChainCards {
         emit TradeCreated(tradeId, msg.sender, cardId);
     }
 
-    /// @notice Accept an active trade offer.
     function acceptTrade(uint256 tradeId) external payable noActiveGame {
         TradeOffer storage t = trades[tradeId];
         require(t.active, "Trade not active");
 
         if (t.wantsCard) {
-            // Card-for-card swap, no payment needed
             require(msg.value == 0, "No payment needed for card swap");
             cardBalance[msg.sender][t.wantedCardId] -= 1;
             cardBalance[t.seller][t.wantedCardId]   += 1;
         } else {
-            // Token payment goes directly to the seller
             require(msg.value == t.tokenPrice, "Wrong payment amount");
             (bool ok, ) = t.seller.call{value: msg.value}("");
             require(ok, "Payment failed");
@@ -506,7 +511,6 @@ contract ChainCards {
         emit TradeFulfilled(tradeId, msg.sender);
     }
 
-    /// @notice Cancel your own trade offer and reclaim the escrowed card.
     function cancelTrade(uint256 tradeId) external {
         require(tradeId < trades.length, "Invalid trade id");
         TradeOffer storage t = trades[tradeId];
@@ -515,12 +519,9 @@ contract ChainCards {
 
         cardBalance[msg.sender][t.offeredCardId] += 1;
         t.active = false;
-
         emit TradeCancelled(tradeId);
     }
 
-    /// @notice Reclaim a card from an expired trade. Anyone can call this to
-    ///         clean up stale offers.
     function reclaimExpiredTrade(uint256 tradeId) external {
         require(tradeId < trades.length, "Invalid trade id");
         TradeOffer storage t = trades[tradeId];
@@ -529,7 +530,6 @@ contract ChainCards {
 
         cardBalance[t.seller][t.offeredCardId] += 1;
         t.active = false;
-
         emit TradeCancelled(tradeId);
     }
 
@@ -537,7 +537,6 @@ contract ChainCards {
     //  Admin
     // =====================================================================
 
-    /// @notice Mint a specific card to a player (for promotional events).
     function mintCard(address to, uint8 cardId, uint256 amount) external onlyOwner {
         require(cardId < NUM_CARDS, "Invalid card");
         cardBalance[to][cardId] += amount;
@@ -547,89 +546,71 @@ contract ChainCards {
     //  View helpers
     // =====================================================================
 
-    /// @notice Get all card balances for a player (array of 20 counts).
     function getCollection(address player) external view returns (uint256[20] memory counts) {
         for (uint8 i = 0; i < NUM_CARDS; i++) {
             counts[i] = cardBalance[player][i];
         }
     }
 
-    /// @notice Get full game state for a player.
     function getGame(address player) external view returns (
         uint8   levelId,
-        uint8   phase,       // 0=None, 1=Committed, 2=Dealt
+        uint8   phase,
         uint8   playerHp,
         uint8   enemyHp,
         uint8   turn,
         uint8   deckSize,
         uint8[5] memory hand,
-        uint8   handSize
+        uint8   handSize,
+        uint8   enemyBlock,
+        bool    enemyBuffed
     ) {
         Game storage g = games[player];
         return (
-            g.levelId,
-            uint8(g.phase),
-            g.playerHp,
-            g.enemyHp,
-            g.turn,
-            g.deckSize,
-            g.hand,
-            g.handSize
+            g.levelId, uint8(g.phase), g.playerHp, g.enemyHp,
+            g.turn, g.deckSize, g.hand, g.handSize,
+            g.enemyBlock, g.enemyBuffed
         );
     }
 
-    /// @notice Get the number of trade offers (including inactive).
     function getTradeCount() external view returns (uint256) {
         return trades.length;
     }
 
-    /// @notice Enumerate active trades (paginated). Returns up to `limit`
-    ///         active trade IDs starting from `offset`.
     function getActiveTrades(uint256 offset, uint256 limit)
         external view returns (uint256[] memory ids, uint256 total)
     {
-        // First pass: count active trades
         uint256 count;
         for (uint256 i = 0; i < trades.length; i++) {
-            if (trades[i].active && block.timestamp <= trades[i].expiresAt) {
-                count++;
-            }
+            if (trades[i].active && block.timestamp <= trades[i].expiresAt) count++;
         }
         total = count;
 
-        // Second pass: collect the requested page
-        if (offset >= count) {
-            ids = new uint256[](0);
-            return (ids, total);
-        }
+        if (offset >= count) { ids = new uint256[](0); return (ids, total); }
         uint256 end = offset + limit;
         if (end > count) end = count;
         ids = new uint256[](end - offset);
 
-        uint256 found;
-        uint256 written;
+        uint256 found; uint256 written;
         for (uint256 i = 0; i < trades.length && written < ids.length; i++) {
             if (trades[i].active && block.timestamp <= trades[i].expiresAt) {
-                if (found >= offset) {
-                    ids[written++] = i;
-                }
+                if (found >= offset) ids[written++] = i;
                 found++;
             }
         }
     }
 
-    /// @notice Get card definition (useful for frontends).
-    function getCardDef(uint8 cardId) external view returns (uint8 attack, uint8 defense) {
+    /// @notice Returns the card type (0-4), value, and mana cost for a given card ID.
+    function getCardDef(uint8 cardId) external view returns (uint8 cardType, uint8 value, uint8 cost) {
         require(cardId < NUM_CARDS, "Invalid card");
-        return (cards[cardId].attack, cards[cardId].defense);
+        return (uint8(cards[cardId].cardType), cards[cardId].value, cards[cardId].cost);
     }
 
-    /// @notice Get enemy action for a given level and turn.
-    function getEnemyAction(uint8 levelId, uint8 turn) external view returns (uint8 attack, uint8 defense) {
+    /// @notice Returns the enemy action type (0-2) and value for a given level/turn.
+    function getEnemyAction(uint8 levelId, uint8 turn) external view returns (uint8 actionType, uint8 value) {
         require(levelId < NUM_LEVELS, "Invalid level");
         LevelDef memory lvl = levels[levelId];
         EnemyAction memory ea = enemyActions[levelId][turn % lvl.numActions];
-        return (ea.attack, ea.defense);
+        return (uint8(ea.actionType), ea.value);
     }
 
     // =====================================================================
