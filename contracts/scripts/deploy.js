@@ -6,8 +6,8 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const RPC_URL     = process.env.RPC_URL     ?? "http://127.0.0.1:8545";
-// Hardhat Account #0 — pre-funded on `npx hardhat node`
-const PRIVATE_KEY = process.env.PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+// Alice dev account — pre-funded on Polkadot local EVM chains
+const PRIVATE_KEY = process.env.PRIVATE_KEY ?? "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133";
 const NETWORK     = process.env.NETWORK     ?? "local";
 
 async function main() {

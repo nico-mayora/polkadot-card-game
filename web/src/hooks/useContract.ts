@@ -19,9 +19,9 @@ export const publicClient = createPublicClient({
 });
 
 const LOCAL_CHAIN = {
-  id: 31337,
-  name: "Hardhat Local",
-  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+  id: 420420421,
+  name: "Polkadot Local",
+  nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 10 },
   rpcUrls: { default: { http: [RPC_URL] } },
 };
 
@@ -32,7 +32,7 @@ export async function ensureLocalNetwork() {
   try {
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: "0x7A69" }], // 31337
+      params: [{ chainId: "0x190f1b45" }], // 420420421
     });
   } catch (e: any) {
     // 4902 = chain not added yet
@@ -40,9 +40,9 @@ export async function ensureLocalNetwork() {
       await window.ethereum.request({
         method: "wallet_addEthereumChain",
         params: [{
-          chainId: "0x7A69",
-          chainName: "Hardhat Local",
-          nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+          chainId: "0x190f1b45",
+          chainName: "Polkadot Local",
+          nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 10 },
           rpcUrls: ["http://127.0.0.1:8545"],
         }],
       });
@@ -73,8 +73,9 @@ async function sendTx(functionName: string, args?: unknown[], value?: bigint) {
     functionName,
     args,
     value,
+    gas: 500_000n, // explicit limit so wallets don't estimate without value
   } as any);
-  return publicClient.waitForTransactionReceipt({ hash });
+  return publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 1_000 });
 }
 
 export function parseReceiptLogs(receipt: any) {

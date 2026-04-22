@@ -3,7 +3,12 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "WebFetch(domain:paritytech.github.io)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl *)",
+      "Bash(node -e ' *)",
+      "Bash(node --input-type=module)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

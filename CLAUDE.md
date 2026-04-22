@@ -34,8 +34,9 @@ How do I generate random numbers on a smart contract? (for opening packs, shuffl
 Log in? How do I sign transactions?
 
 # TODO
-- Test on Polkadot Ecosystem (zombienet
-    - Deploy locally *exactly* as in the Polkadot template above.
+- Test on Polkadot Ecosystem
+    - Deploy locally *exactly* as in the Polkadot template above. Check the `scripts/` directory.
+    - Polkadot SDK binaries (stable2512-3): polkadot, polkadot-prepare-worker, polkadot-execute-worker (relay), polkadot-omni-node, eth-rpc, chain-spec-builder, and zombienet (template has a script to download them)
 - Instead of hard-coding cards, persist them in the bulletin chain. Don't worry yet about renewing, but make a script that pushes all cards *not already on that chain* to it, so I can add new cards easily and re-add expired ones.
 - Every little action needs Approving. Can the user experience be improved?
 - ~The trade page is not working properly.~
@@ -52,7 +53,7 @@ Log in? How do I sign transactions?
 These are goals we must hit, our 'North Star'
 - Deploy on Paseo AssetHub chain
 - Use the new Polkadot Triangle UX
-    - PWAllet (https://app.dotsamalabs.com, replaces Talisman)
+    - Sign transactions with PWallet (https://app.dotsamalabs.com, replaces Talisman)
     - Dotli NS
     - Bulletin chain
 

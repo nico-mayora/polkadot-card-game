@@ -1,0 +1,37 @@
+[settings]
+timeout = 1000
+
+[relaychain]
+chain = "rococo-local"
+default_command = "polkadot"
+
+  [[relaychain.nodes]]
+  name = "alice"
+  validator = true
+  ws_port = 9950
+  rpc_port = 9949
+  p2p_port = 30335
+  prometheus_port = 9617
+
+  [[relaychain.nodes]]
+  name = "bob"
+  validator = true
+  ws_port = 9952
+  rpc_port = 9951
+  p2p_port = 30336
+  prometheus_port = 9618
+
+[[parachains]]
+id = 1000
+chain = "./chain_spec.json"
+cumulus_based = true
+
+  [[parachains.collators]]
+  name = "collator-01"
+  validator = true
+  ws_port = 9944
+  rpc_port = 9933
+  p2p_port = 30333
+  prometheus_port = 9615
+  command = "polkadot-omni-node"
+  args = ["--enable-statement-store"]

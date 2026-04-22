@@ -10,9 +10,9 @@ export default defineConfig({
     local: {
       type: "http",
       url: "http://127.0.0.1:8545",
-      // Hardhat Account #0 — pre-funded on `npx hardhat node`
+      // Alice dev account — pre-funded on Polkadot local EVM chains
       accounts: [
-        "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133",
       ],
     },
     ...(process.env.DEPLOYER_KEY ? {
