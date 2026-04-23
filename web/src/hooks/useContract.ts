@@ -31,7 +31,7 @@ const PASEO_CHAIN = {
   id: 420420421,
   name: "Paseo Asset Hub",
   nativeCurrency: { name: "PAS", symbol: "PAS", decimals: 16 },
-  rpcUrls: { default: { http: ["https://asset-hub-paseo.dotters.network"] } },
+  rpcUrls: { default: { http: ["https://services.polkadothub-rpc.com/testnet"] } },
 };
 
 const ACTIVE_CHAIN = IS_PASEO ? PASEO_CHAIN : LOCAL_CHAIN;

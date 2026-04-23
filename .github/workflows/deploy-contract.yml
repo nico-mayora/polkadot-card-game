@@ -37,7 +37,7 @@ jobs:
       - name: Deploy to Paseo AssetHub
         run: node scripts/deploy.js
         env:
-          RPC_URL: https://asset-hub-paseo.dotters.network
+          RPC_URL: https://services.polkadothub-rpc.com/testnet
           DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
           NETWORK: paseo
 

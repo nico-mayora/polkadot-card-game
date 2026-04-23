@@ -6,7 +6,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "deploy:local": "npm run compile && node scripts/deploy.js",
-    "deploy:paseo": "npm run compile && RPC_URL=https://asset-hub-paseo.dotters.network NETWORK=paseo node scripts/deploy.js",
+    "deploy:paseo": "npm run compile && RPC_URL=https://services.polkadothub-rpc.com/testnet NETWORK=paseo node scripts/deploy.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

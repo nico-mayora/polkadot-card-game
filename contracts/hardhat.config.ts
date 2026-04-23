@@ -20,7 +20,7 @@ export default defineConfig({
     },
     ...(process.env.DEPLOYER_KEY ? {
         paseo: {
-            url: "https://asset-hub-paseo.dotters.network",
+            url: "https://services.polkadothub-rpc.com/testnet",
                 accounts: [process.env.DEPLOYER_KEY],
         },
     } : {}),
