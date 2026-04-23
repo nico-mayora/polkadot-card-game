@@ -126,7 +126,9 @@ contract ChainCards {
         uint8 dmgTaken,
         uint8 playerHp,
         uint8 enemyHp,
-        uint8 newEnemyBlock
+        uint8 newEnemyBlock,
+        uint8 turn,
+        bool  newEnemyBuffed
     );
     event GameEnded(address indexed player, bool won);
     event TradeCreated(uint256 indexed tradeId, address indexed seller, uint8 offeredCardId);
@@ -375,7 +377,7 @@ contract ChainCards {
 
         if (eHp == 0) {
             emit TurnResolved(msg.sender, dmgDealt, healAmt, pBlock,
-                uint8(ea.actionType), ea.value, 0, pHp, 0, 0);
+                uint8(ea.actionType), ea.value, 0, pHp, 0, 0, g.turn, g.enemyBuffed);
             emit GameEnded(msg.sender, true);
             _clearGame(msg.sender);
             return;
@@ -403,7 +405,7 @@ contract ChainCards {
         }
 
         emit TurnResolved(msg.sender, dmgDealt, healAmt, pBlock,
-            uint8(ea.actionType), ea.value, dmgTaken, pHp, eHp, g.enemyBlock);
+            uint8(ea.actionType), ea.value, dmgTaken, pHp, eHp, g.enemyBlock, g.turn, g.enemyBuffed);
 
         g.playerHp = pHp;
         g.enemyHp  = eHp;

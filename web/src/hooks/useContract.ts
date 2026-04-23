@@ -7,7 +7,7 @@ import {
   parseUnits,
   parseEventLogs,
 } from "viem";
-import { deployment } from "../config/deployments";
+import deployment from "../config/deployments.json";
 
 const IS_PASEO = !!import.meta.env.VITE_ETH_RPC_URL;
 

@@ -20,8 +20,9 @@ export default defineConfig({
     },
     ...(process.env.DEPLOYER_KEY ? {
         paseo: {
+            type: "http" as const,
             url: "https://services.polkadothub-rpc.com/testnet",
-                accounts: [process.env.DEPLOYER_KEY],
+            accounts: [process.env.DEPLOYER_KEY],
         },
     } : {}),
   },

@@ -442,7 +442,7 @@ export default function ChainCardsGame() {
       const bLog = [...battle.battleLog];
 
       if (turnEv) {
-        const { dmgDealt, healAmount, blockGained, enemyActionType, enemyActionValue, dmgTaken, playerHp, enemyHp, newEnemyBlock } = turnEv.args;
+        const { dmgDealt, healAmount, blockGained, enemyActionType, enemyActionValue, dmgTaken, playerHp, enemyHp, newEnemyBlock, turn: resolvedTurn, newEnemyBuffed } = turnEv.args;
         const nDmg   = Number(dmgDealt);
         const nHeal  = Number(healAmount);
         const nBlock = Number(blockGained);
@@ -452,6 +452,8 @@ export default function ChainCardsGame() {
         const nPHp   = Number(playerHp);
         const nEHp   = Number(enemyHp);
         const nEBlock = Number(newEnemyBlock);
+        const nextTurn = Number(resolvedTurn) + 1;
+        const nextEnemyBuffed = Boolean(newEnemyBuffed);
 
         const parts = [];
         if (nDmg  > 0) parts.push(`⚔ ${nDmg} dmg to enemy`);
@@ -471,10 +473,6 @@ export default function ChainCardsGame() {
           }
         }
 
-        const newEnemyBuffed = eaType === EA_BUFF ? true
-          : eaType === EA_ATTACK ? false
-          : battle.enemyBuffed; // persist buff through non-attack turns
-
         if (endEv) {
           const won = endEv.args.won;
           bLog.push(won ? "🏆 VICTORY!" : "💀 DEFEAT.");
@@ -488,12 +486,12 @@ export default function ChainCardsGame() {
         } else {
           // Hand was dealt in the same tx — parse it from the same receipt
           const hand = parseHandFromReceipt(receipt, account);
-          bLog.push(`--- Turn ${battle.turn + 2} ---`);
+          bLog.push(`--- Turn ${nextTurn + 1} ---`);
           setBattle((prev) => ({
             ...prev, phase: "play",
             playerHp: nPHp, enemyHp: nEHp,
-            enemyBlock: nEBlock, enemyBuffed: newEnemyBuffed,
-            turn: prev.turn + 1,
+            enemyBlock: nEBlock, enemyBuffed: nextEnemyBuffed,
+            turn: nextTurn,
             hand, handSize: hand.length,
             deckSize: prev.deckSize + prev.handSize - hand.length,
             selectedCards: [], battleLog: bLog,

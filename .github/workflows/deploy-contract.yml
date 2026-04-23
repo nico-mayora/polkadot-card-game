@@ -35,17 +35,15 @@ jobs:
         run: npm run compile
 
       - name: Deploy to Paseo AssetHub
-        run: node scripts/deploy.js
+        run: RPC_URL=https://services.polkadothub-rpc.com/testnet npx hardhat run scripts/deploy.ts --network paseo
         env:
-          RPC_URL: https://services.polkadothub-rpc.com/testnet
           DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
-          NETWORK: paseo
 
-      - name: Commit updated deployments.ts
+      - name: Commit updated deployments.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ../web/src/config/deployments.ts
+          git add ../web/src/config/deployments.json
           git diff --staged --quiet && echo "No changes to commit" || \
             git commit -m "chore: deploy ChainCards to Paseo AssetHub"
           git push

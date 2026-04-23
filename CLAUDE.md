@@ -47,6 +47,8 @@ Log in? How do I sign transactions?
     - ~Make the AI more complex.~
     - ~Keep the scope limited. I don't want this to blow up into the next MTG or anything.~
 - ~BUG: Forefeit game but cancel transaction: stuck on game one can't exit.~
+- BUG: Enemies attack when Powering up. Turns start getting out of sync with the telegraph.
+- Remove "cards remaining" as now played cards are shuffled back into the library.
 
 ## Core required functionality
 These are goals we must hit, our 'North Star'
