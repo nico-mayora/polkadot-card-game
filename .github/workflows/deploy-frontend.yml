@@ -76,7 +76,7 @@ jobs:
         working-directory: web
         run: npm run build
         env:
-          VITE_ETH_RPC_URL: https://testnet-passet-hub-eth-rpc.polkadot.io
+          VITE_ETH_RPC_URL: https://asset-hub-paseo.dotters.network
 
       - uses: actions/upload-artifact@v4
         with:
