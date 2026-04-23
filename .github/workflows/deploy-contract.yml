@@ -1,0 +1,51 @@
+name: Deploy Contract to Paseo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-contract
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Compile & Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Deploy to Paseo AssetHub
+        run: node scripts/deploy.js
+        env:
+          RPC_URL: https://testnet-passet-hub-eth-rpc.polkadot.io
+          DEPLOYER_KEY: ${{ secrets.DEPLOYER_KEY }}
+          NETWORK: paseo
+
+      - name: Commit updated deployments.ts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ../web/src/config/deployments.ts
+          git diff --staged --quiet && echo "No changes to commit" || \
+            git commit -m "chore: deploy ChainCards to Paseo AssetHub"
+          git push

@@ -1,0 +1,220 @@
+name: Deploy Frontend to DotNS
+
+on:
+  workflow_dispatch:
+    inputs:
+      basename:
+        description: 'DotNS basename (for example: my-hackathon-app)'
+        type: string
+        # Lowercase letters, digits, and hyphens only. Cannot start/end with hyphen.
+        # Name must be 9+ letters followed by exactly 2 digits (e.g. "my-cool-project42").
+        default: 'chain-cards00'
+      skip-cache:
+        description: 'Skip deployment cache and force redeploy'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  statuses: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: deploy-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: Check for changes
+    outputs:
+      source-hash: ${{ steps.source-hash.outputs.hash }}
+      cache-hit: ${{ steps.cache-check.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute source hash
+        id: source-hash
+        run: echo "hash=$(git ls-files web/ .github/workflows/deploy-frontend.yml | xargs sha256sum | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Check deployment cache
+        id: cache-check
+        uses: actions/cache@v4
+        with:
+          path: .deployment-marker
+          key: deployment-${{ steps.source-hash.outputs.hash }}
+          lookup-only: true
+
+  build:
+    needs: check
+    if: needs.check.outputs.cache-hit != 'true' || inputs.skip-cache
+    runs-on: ubuntu-latest
+    name: Build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Cache build
+        id: cache-build
+        uses: actions/cache@v4
+        with:
+          path: web/dist
+          key: build-${{ needs.check.outputs.source-hash }}
+
+      - name: Build app
+        if: steps.cache-build.outputs.cache-hit != 'true'
+        working-directory: web
+        run: npm run build
+        env:
+          VITE_ETH_RPC_URL: https://testnet-passet-hub-eth-rpc.polkadot.io
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: web/dist
+          retention-days: 1
+  deploy:
+    needs: [check, build]
+    if: needs.check.outputs.cache-hit != 'true' || inputs.skip-cache
+    name: Deploy
+    runs-on: ubuntu-latest
+    env:
+      # The DotNS CLI default Asset Hub RPC has been unreliable in CI.
+      # These explicit endpoints are passed both as action inputs and as
+      # DOTNS_RPC fallbacks for nested dotns-sdk composite action steps.
+      DOTNS_BULLETIN_RPC: wss://paseo-bulletin-rpc.polkadot.io
+      DOTNS_ASSET_HUB_RPC: wss://asset-hub-paseo.dotters.network
+    steps:
+      - name: Checkout DotNS SDK actions
+        uses: actions/checkout@v4
+        with:
+          repository: paritytech/dotns-sdk
+          ref: main
+          sparse-checkout: |
+            .github/actions
+            packages/cli
+            packages/ui/package.json
+            packages/ui/.papi
+            package.json
+            bun.lock
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: build
+
+      - name: Setup DotNS CLI
+        uses: ./.github/actions/setup-cli
+        with:
+          source: release
+
+      - name: Export CAR file
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! command -v ipfs &>/dev/null; then
+            echo "Installing IPFS Kubo..."
+            wget -qO- https://dist.ipfs.tech/kubo/v0.33.2/kubo_v0.33.2_linux-amd64.tar.gz | tar xz
+            sudo mv kubo/ipfs /usr/local/bin/
+            rm -rf kubo
+          fi
+
+          ipfs init --profile server 2>/dev/null || true
+
+          CID=$(ipfs add -Q -r --cid-version=1 --raw-leaves --pin=false ./build)
+          ipfs dag export "$CID" > build.car
+          SIZE=$(stat --printf='%s' build.car)
+
+          echo "::notice::CAR file created: $(numfmt --to=iec $SIZE) - IPFS CID: $CID"
+
+      - name: Upload to Bulletin
+        id: bulletin
+        uses: ./.github/actions/bulletin
+        with:
+          mnemonic: ${{ secrets.BULLETIN_MNEMONIC || 'bottom drive obey lake curtain smoke basket hold race lonely fit walk' }}
+          bulletin-rpc: ${{ env.DOTNS_BULLETIN_RPC }}
+          build-path: ./build.car
+          upload-concurrency: 4
+          max-retries: 3
+          retry-delay: 15
+          cache: false
+        env:
+          DOTNS_RPC: ${{ env.DOTNS_BULLETIN_RPC }}
+
+      - name: Register and set contenthash
+        uses: ./.github/actions/dotns
+        with:
+          mnemonic: ${{ secrets.DOTNS_MNEMONIC || 'bottom drive obey lake curtain smoke basket hold race lonely fit walk' }}
+          rpc: ${{ env.DOTNS_ASSET_HUB_RPC }}
+          basename: ${{ inputs.basename }}
+          mode: production
+          domain: ${{ inputs.basename }}
+          register-base: true
+          cid: ${{ steps.bulletin.outputs.cid }}
+          max-retries: 3
+          retry-delay: 15
+        env:
+          DOTNS_RPC: ${{ env.DOTNS_ASSET_HUB_RPC }}
+
+      - name: Summary
+        shell: bash
+        run: |
+          FQDN="${BASENAME}.dot"
+          URL="https://${BASENAME}.dot.li"
+          URL_DIRECT="https://${FQDN}"
+
+          BULLETIN_AUTH="mnemonic"
+          if [[ -z "$BULLETIN_MNEMONIC" ]]; then
+            BULLETIN_AUTH="alice"
+          fi
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Deployment Complete
+
+          | Property | Value |
+          |----------|-------|
+          | Mode | \`production\` |
+          | Domain | \`${FQDN}\` |
+          | CID | \`${CID}\` |
+          | URL | [${URL}](${URL}) |
+          | URL (direct) | [${URL_DIRECT}](${URL_DIRECT}) |
+          | Bulletin RPC | \`${DOTNS_BULLETIN_RPC}\` |
+          | Asset Hub RPC | \`${DOTNS_ASSET_HUB_RPC}\` |
+          | Bulletin Auth | ${BULLETIN_AUTH} |
+          EOF
+        env:
+          BASENAME: ${{ inputs.basename }}
+          CID: ${{ steps.bulletin.outputs.cid }}
+          BULLETIN_MNEMONIC: ${{ secrets.BULLETIN_MNEMONIC }}
+
+  post-deploy:
+    needs: [check, deploy]
+    if: needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    name: Mark as deployed
+    steps:
+      - name: Create deployment marker
+        run: echo "deployed" > .deployment-marker
+
+      - name: Cache deployment marker
+        uses: actions/cache/save@v4
+        with:
+          path: .deployment-marker
+          key: deployment-${{ needs.check.outputs.source-hash }}

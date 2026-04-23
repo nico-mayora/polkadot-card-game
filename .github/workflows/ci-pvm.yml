@@ -1,0 +1,36 @@
+name: CI — PVM Contracts
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "contracts/pvm/**"
+      - ".github/workflows/ci-pvm.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "contracts/pvm/**"
+      - ".github/workflows/ci-pvm.yml"
+
+concurrency:
+  group: ci-pvm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Fmt, compile & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/pvm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contracts/pvm/package-lock.json
+      - run: npm ci
+      - run: npm run fmt:check
+      - run: npm run compile
+      - run: npm test

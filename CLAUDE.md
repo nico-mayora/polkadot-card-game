@@ -34,26 +34,26 @@ Log in? How do I sign transactions?
 
 # TODO
 - Test on Polkadot Ecosystem
-    - Deploy locally *exactly* as in the Polkadot template above. Check the `scripts/` directory.
-    - Polkadot SDK binaries (stable2512-3): polkadot, polkadot-prepare-worker, polkadot-execute-worker (relay), polkadot-omni-node, eth-rpc, chain-spec-builder, and zombienet (template has a script to download them)
+    - ~Deploy locally *exactly* as in the Polkadot template above. Check the `scripts/` directory.~
+    - ~Polkadot SDK binaries (stable2512-3): polkadot, polkadot-prepare-worker, polkadot-execute-worker (relay), polkadot-omni-node, eth-rpc, chain-spec-builder, and zombienet (template has a script to download them)~
+    - Test on Paseo
 - Instead of hard-coding cards, persist them in the bulletin chain. Don't worry yet about renewing, but make a script that pushes all cards *not already on that chain* to it, so I can add new cards easily and re-add expired ones.
 - Every little action needs Approving. Can the user experience be improved?
 - ~The trade page is not working properly.~
 - ~How can I test the trade page?~
-- Page should remember deck for future duels.
-- The game is currently not that fun. Gameplay should have a bit more substance:
-    - Make cards more like actions instead of creatures and enemies more challenging. (Think "Slay The Spire")
-    - Make the AI more complex.
-    - Keep the scope limited. I don't want this to blow up into the next MTG or anything.
+- ~Page should remember deck for future duels.~
+- ~The game is currently not that fun. Gameplay should have a bit more substance:~
+    - ~Make cards more like actions instead of creatures and enemies more challenging. (Think "Slay The Spire")~
+    - ~Make the AI more complex.~
+    - ~Keep the scope limited. I don't want this to blow up into the next MTG or anything.~
 - ~BUG: Forefeit game but cancel transaction: stuck on game one can't exit.~
 
-## Meat of the Issue
+## Core required functionality
 These are goals we must hit, our 'North Star'
 - Deploy on Paseo AssetHub chain
 - Use the new Polkadot Triangle UX
     - Sign transactions with PWallet (https://app.dotsamalabs.com, replaces Talisman)
-        - PWAllet is currently not working, so this isn't a necessary requirement anymore
-    - Dotli NS (use template GitHub action to deploy)
+    - Dotli NS: Hosts the front-end on IPFS. (adapt GitHub action to deploy there)
     - Bulletin chain
         - For card storage.
         - Create a script that pushes the cards to the chain IF NOT ALREADY THERE (to avoid duplicates).

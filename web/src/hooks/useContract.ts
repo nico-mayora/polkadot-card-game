@@ -9,8 +9,9 @@ import {
 } from "viem";
 import { deployment } from "../config/deployments";
 
-const RPC_URL =
-  import.meta.env.VITE_LOCAL_ETH_RPC_URL ||
+const IS_PASEO = !!import.meta.env.VITE_ETH_RPC_URL;
+
+const RPC_URL = import.meta.env.VITE_LOCAL_ETH_RPC_URL ||
   import.meta.env.VITE_ETH_RPC_URL ||
   "http://127.0.0.1:8545";
 
@@ -25,14 +26,25 @@ const LOCAL_CHAIN = {
   rpcUrls: { default: { http: [RPC_URL] } },
 };
 
-export async function ensureLocalNetwork() {
+// Paseo AssetHub EVM — chain ID 420420421 (0x190F1B5)
+const PASEO_CHAIN = {
+  id: 420420421,
+  name: "Paseo Asset Hub",
+  nativeCurrency: { name: "PAS", symbol: "PAS", decimals: 16 },
+  rpcUrls: { default: { http: ["https://testnet-passet-hub-eth-rpc.polkadot.io"] } },
+};
+
+const ACTIVE_CHAIN = IS_PASEO ? PASEO_CHAIN : LOCAL_CHAIN;
+
+export async function ensureCorrectNetwork() {
   if (!window.ethereum) throw new Error("No wallet found");
   const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
-  if (parseInt(chainIdHex, 16) === LOCAL_CHAIN.id) return;
+  if (parseInt(chainIdHex, 16) === ACTIVE_CHAIN.id) return;
+  const chainIdParam = `0x${ACTIVE_CHAIN.id.toString(16)}`;
   try {
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: "0x7A69" }], // 31337
+      params: [{ chainId: chainIdParam }],
     });
   } catch (e: any) {
     // 4902 = chain not added yet
@@ -40,10 +52,10 @@ export async function ensureLocalNetwork() {
       await window.ethereum.request({
         method: "wallet_addEthereumChain",
         params: [{
-          chainId: "0x7A69",
-          chainName: "Card Game Local",
-          nativeCurrency: { name: "DOT", symbol: "DOT", decimals: 16 },
-          rpcUrls: ["http://127.0.0.1:8545"],
+          chainId: chainIdParam,
+          chainName: ACTIVE_CHAIN.name,
+          nativeCurrency: ACTIVE_CHAIN.nativeCurrency,
+          rpcUrls: ACTIVE_CHAIN.rpcUrls.default.http,
         }],
       });
     } else throw e;
@@ -52,9 +64,9 @@ export async function ensureLocalNetwork() {
 
 export async function getWalletClient() {
   if (!window.ethereum) throw new Error("No wallet found");
-  await ensureLocalNetwork();
+  await ensureCorrectNetwork();
   const [account] = await window.ethereum.request({ method: "eth_requestAccounts" });
-  return createWalletClient({ account, chain: LOCAL_CHAIN, transport: custom(window.ethereum) });
+  return createWalletClient({ account, chain: ACTIVE_CHAIN, transport: custom(window.ethereum) });
 }
 
 function gameContract() {
@@ -75,20 +87,8 @@ export async function waitForNextBlock(timeout = 30_000) {
   throw new Error("Timed out waiting for next block");
 }
 
-async function waitForNonceIncrease(address: `0x${string}`, nonceBefore: bigint, timeout = 30_000) {
-  const deadline = Date.now() + timeout;
-  while (Date.now() < deadline) {
-    const nonce = await publicClient.getTransactionCount({ address, blockTag: "latest" });
-    if (BigInt(nonce) > nonceBefore) return;
-    await new Promise((r) => setTimeout(r, 1_000));
-  }
-  throw new Error("Timed out waiting for transaction to be included in a block");
-}
-
 async function sendTx(functionName: string, args?: unknown[], value?: bigint) {
   const wallet = await getWalletClient();
-  const address = wallet.account.address as `0x${string}`;
-  const nonceBefore = BigInt(await publicClient.getTransactionCount({ address, blockTag: "latest" }));
   const hash = await wallet.writeContract({
     address: deployment.address as `0x${string}`,
     abi: deployment.abi,

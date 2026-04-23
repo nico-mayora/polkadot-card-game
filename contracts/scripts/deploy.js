@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const RPC_URL     = process.env.RPC_URL     ?? "http://127.0.0.1:8545";
 // Alice dev account — pre-funded on Polkadot local EVM chains
-const PRIVATE_KEY = process.env.PRIVATE_KEY ?? "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133";
+const PRIVATE_KEY = process.env.DEPLOYER_KEY ?? "0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133";
 const NETWORK     = process.env.NETWORK     ?? "local";
 
 async function main() {

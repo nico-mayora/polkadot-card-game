@@ -1,0 +1,34 @@
+name: CI — EVM Contracts
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/ci-evm.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "contracts/**"
+      - ".github/workflows/ci-evm.yml"
+
+concurrency:
+  group: ci-evm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Compile
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+      - run: npm ci
+      - run: npm run compile
