@@ -12,7 +12,9 @@
       "Bash(python3 -c ' *)",
       "Bash(python3 -c \" import json, sys abi = json.load\\(sys.stdin\\)['abi'] for item in abi: if item.get\\('type'\\) == 'function' and item.get\\('name'\\) in ['packCommitBlock', 'commitPack', 'getGame', 'claimStarterPack']: print\\(item\\) \")",
       "Bash(node *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "WebFetch(domain:docs.polkadot.com)",
+      "WebFetch(domain:www.dwellir.com)"
     ]
   }
 }

@@ -16,9 +16,6 @@ contracts/cache/
 contracts/types/
 contracts/coverage/
 
-# ─── Auto-generated deployment config (written by deploy script) ─
-web/src/config/deployments.ts
-
 # ─── Polkadot SDK binaries (downloaded by scripts/download-sdk-binaries.sh) ─
 bin/
 

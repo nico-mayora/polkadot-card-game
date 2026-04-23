@@ -28,7 +28,7 @@ const LOCAL_CHAIN = {
 
 // Paseo AssetHub EVM — chain ID 420420421 (0x190F1B5)
 const PASEO_CHAIN = {
-  id: 420420421,
+  id: 420420417,
   name: "Paseo Asset Hub",
   nativeCurrency: { name: "PAS", symbol: "PAS", decimals: 16 },
   rpcUrls: { default: { http: ["https://services.polkadothub-rpc.com/testnet"] } },
@@ -77,11 +77,11 @@ function gameContract() {
   });
 }
 
-export async function waitForNextBlock(timeout = 30_000) {
+export async function waitForNextBlock(timeout = 120_000) {
   const start = await publicClient.getBlockNumber();
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 1_000));
+    await new Promise((r) => setTimeout(r, 2_000));
     if (await publicClient.getBlockNumber() > start) return;
   }
   throw new Error("Timed out waiting for next block");
@@ -97,7 +97,7 @@ async function sendTx(functionName: string, args?: unknown[], value?: bigint) {
     value,
     gas: 500_000n,
   } as any);
-  return publicClient.waitForTransactionReceipt({ hash, timeout: 30_000, pollingInterval: 400 });
+  return publicClient.waitForTransactionReceipt({ hash, timeout: 120_000, pollingInterval: 2_000 });
 }
 
 export function parseReceiptLogs(receipt: any) {
@@ -126,9 +126,12 @@ export const getWalletBalance = (address: string) =>
 
 export async function getPackPending(player: string): Promise<boolean> {
   const addr = deployment.address as `0x${string}`;
+  // Scan only the last ~100k blocks (~7 days on Paseo) to avoid querying from genesis
+  const latest = await publicClient.getBlockNumber();
+  const fromBlock = latest > 100_000n ? latest - 100_000n : 0n;
   const [committed, opened] = await Promise.all([
-    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackCommitted", inputs: [{ name: "player", type: "address", indexed: true }] }, args: { player: player as `0x${string}` }, fromBlock: 0n }),
-    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackOpened", inputs: [{ name: "player", type: "address", indexed: true }, { name: "card0", type: "uint8", indexed: false }, { name: "card1", type: "uint8", indexed: false }, { name: "card2", type: "uint8", indexed: false }] }, args: { player: player as `0x${string}` }, fromBlock: 0n }),
+    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackCommitted", inputs: [{ name: "player", type: "address", indexed: true }] }, args: { player: player as `0x${string}` }, fromBlock }),
+    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackOpened", inputs: [{ name: "player", type: "address", indexed: true }, { name: "card0", type: "uint8", indexed: false }, { name: "card1", type: "uint8", indexed: false }, { name: "card2", type: "uint8", indexed: false }] }, args: { player: player as `0x${string}` }, fromBlock }),
   ]);
   return committed.length > opened.length;
 }
