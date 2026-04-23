@@ -1,5 +1,5 @@
 {
-  "address": "0x0000000000000000000000000000000000000000",
+  "address": "0x3E4f3D7B71fF60716f708DEE41285c91179A5ee2",
   "abi": [
     {
       "inputs": [],
@@ -961,6 +961,5 @@
       "type": "function"
     }
   ],
-  "network": "local",
-  "deployedAt": ""
+  "deployedAt": "2026-04-23T16:03:38.847Z"
 }
