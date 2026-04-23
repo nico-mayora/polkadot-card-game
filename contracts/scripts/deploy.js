@@ -19,10 +19,17 @@ async function main() {
   const provider = new ethers.JsonRpcProvider(RPC_URL);
   const wallet   = new ethers.Wallet(PRIVATE_KEY, provider);
 
-  console.log("Deploying from:", wallet.address);
+  const balance = await provider.getBalance(wallet.address);
+  console.log("Deploying from:", wallet.address, `(balance: ${ethers.formatUnits(balance, 16)} DOT)`);
+  if (balance === 0n) throw new Error("Deployer account has no balance — fund it first");
+
+  const feeData = await provider.getFeeData();
+  const overrides = feeData.gasPrice
+    ? { type: 0, gasPrice: feeData.gasPrice }  // legacy tx for chains without EIP-1559 support
+    : {};
 
   const factory  = new ethers.ContractFactory(artifact.abi, artifact.bytecode, wallet);
-  const contract = await factory.deploy();
+  const contract = await factory.deploy(overrides);
   await contract.waitForDeployment();
 
   const address = await contract.getAddress();
