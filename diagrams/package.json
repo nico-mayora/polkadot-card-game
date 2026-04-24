@@ -1,0 +1,11 @@
+{
+  "name": "chain-cards-diagrams",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "mmdc -c mermaid-config.json -i arch.mmd -o ../slides/diagrams/arch.svg -b transparent && mmdc -c mermaid-config.json -i flow.mmd -o ../slides/diagrams/flow.svg -b transparent"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.12.0"
+  }
+}

@@ -17,7 +17,7 @@ contract ChainCards {
     uint8  public constant DECK_SIZE       = 15;
     uint8  public constant HAND_SIZE       = 5;
     uint8  public constant MANA_PER_TURN   = 3;
-    uint8  public constant PACK_SIZE       = 3;
+    uint8  public constant PACK_SIZE       = 5;
     uint8  public constant NUM_LEVELS      = 3;
     uint8  public constant PLAYER_MAX_HP   = 40;
     uint256 public constant TRADE_DURATION = 14 days;
@@ -113,7 +113,7 @@ contract ChainCards {
 
     event StarterClaimed(address indexed player);
     event PackCommitted(address indexed player);
-    event PackOpened(address indexed player, uint8 card0, uint8 card1, uint8 card2);
+    event PackOpened(address indexed player, uint8 card0, uint8 card1, uint8 card2, uint8 card3, uint8 card4);
     event GameStarted(address indexed player, uint8 levelId);
     event HandDealt(address indexed player, uint8 h0, uint8 h1, uint8 h2, uint8 h3, uint8 h4, uint8 handSize);
     event TurnResolved(
@@ -255,7 +255,7 @@ contract ChainCards {
         }
         packCommitBlock[msg.sender] = 0;
 
-        emit PackOpened(msg.sender, drawn[0], drawn[1], drawn[2]);
+        emit PackOpened(msg.sender, drawn[0], drawn[1], drawn[2], drawn[3], drawn[4]);
     }
 
     // =====================================================================

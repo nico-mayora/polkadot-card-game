@@ -1,0 +1,24 @@
+flowchart LR
+    subgraph FE ["React frontend"]
+        direction TB
+        Shop["Shop screen"]
+        Deck["Deck builder"]
+        Battle["Battle screen"]
+        Trade["Trade screen"]
+    end
+
+    subgraph SC ["ChainCards.sol"]
+        direction TB
+        Packs["commitPack / openPack"]
+        Game["commitDeckAndDeal<br/>playAndDeal"]
+        Trades["createTrade<br/>acceptTrade / cancelTrade"]
+        Store[("Storage:<br/>cardBalance · games · trades")]
+        Packs --> Store
+        Game --> Store
+        Trades --> Store
+    end
+
+    Shop --> Packs
+    Deck --> Game
+    Battle --> Game
+    Trade --> Trades

@@ -1,0 +1,129 @@
+
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+        
+
+        <link rel="stylesheet" href="mkslides-assets/reveal-js/dist/reveal.css" />
+
+        
+            <link rel="stylesheet" href="mkslides-assets/reveal-js/dist/theme/black.css" />
+        
+        
+            <link rel="stylesheet" href="mkslides-assets/highlight-js-themes/monokai.css" />
+        
+
+        
+    </head>
+    <body>
+        <div class="reveal">
+            <div class="slides">
+                <section data-markdown
+                
+                >
+                    <!-- The markdown must be placed to the whole left to prevent indentation issues like https://github.com/MartenBE/mkslides/issues/52 -->
+                    <textarea data-template>
+# Chain Cards
+
+### A trading card game on Polkadot AssetHub
+
+Nicolás Mayora — PBA #7
+
+---
+
+## What was built
+
+- Single-player **deck-builder** in the spirit of *Slay the Spire*
+  - 20 cards · 3 levels · 15-card decks · 5-card hands · 3-card packs
+- **Ownership, shuffling and hand validation live on-chain**; battle UI runs in the browser
+- Players **trade cards** for tokens or for other cards
+- Pack sales feed back into new content
+
+---
+
+## Why blockchain?
+
+### The TCG economy is broken
+
+- On traditional on-line TCG's you may spend money on cards, but *you don't own them*.
+- Servers might get shut down at any time, and you'd lose access to your cards.
+- On blockchain, *the cards are yours to keep*.
+- Trading is completely open, meaning the economy regulates itself.
+
+---
+
+### What's actually unique here
+
+- **True ownership** → cards are portable assets, not DB rows
+- **Permissionless P2P trading** → card↔card or card↔token, no house
+- **Provably fair play** → deck shuffle and hand dealing happen *on-chain*, not just ownership
+- **Transparent drops** → booster randomness seeded from a future `blockhash`
+
+---
+
+## Architecture
+
+<img src="diagrams/arch.svg" alt="Architecture diagram" style="max-height: 65vh; width: auto;">
+
+One Solidity contract, compiled with **resolc** to PolkaVM bytecode, deployed through `pallet-revive` on **Paseo AssetHub**. Frontend is static JS, pinned to IPFS and served through **DotNS**.
+
+---
+
+## Gameplay flow
+
+<div style="display: flex; align-items: center; gap: 2em;"><div style="flex: 0 0 55%;"><img src="diagrams/flow.svg" alt="Gameplay flow" style="width: 100%; max-height: 55.5vh; object-fit: contain;"></div><div style="flex: 1; text-align: left; font-size: 0.8em;">The player <strong>can never play a card that wasn't dealt</strong> — the contract rejects the call, so there is nothing to "hack" client-side.</div></div>
+
+---
+
+## Problems encountered
+- 
+
+---
+
+## Try it!
+### `github.com/nico-mayora/polkadot-card-game`
+                    </textarea>
+                </section>
+            </div>
+        </div>
+        <script src="mkslides-assets/reveal-js/dist/reveal.js"></script>
+        <script src="mkslides-assets/reveal-js/dist/plugin/highlight.js"></script>
+        <script src="mkslides-assets/reveal-js/dist/plugin/markdown.js"></script>
+        <script src="mkslides-assets/reveal-js/dist/plugin/math.js"></script>
+        <script src="mkslides-assets/reveal-js/dist/plugin/notes.js"></script>
+        <script src="mkslides-assets/reveal-js/dist/plugin/search.js"></script>
+        <script src="mkslides-assets/reveal-js/dist/plugin/zoom.js"></script>
+
+        
+
+        <script>
+            Reveal.initialize({
+                
+                    
+                        history: true,
+                    
+                        slideNumber: "c/t",
+                    
+                        hash: true,
+                    
+                        transition: "slide",
+                    
+                
+                plugins: [
+                    RevealMarkdown, // Must come before the other plugins so they can hook into the generated HTML.
+                    RevealHighlight,
+                    RevealMath.KaTeX,
+                    RevealNotes,
+                    RevealSearch,
+                    RevealZoom,
+
+                    
+                ],
+            });
+        </script>
+    </body>
+</html>

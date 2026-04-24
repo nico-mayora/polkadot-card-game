@@ -131,7 +131,7 @@ export async function getPackPending(player: string): Promise<boolean> {
   const fromBlock = latest > 100_000n ? latest - 100_000n : 0n;
   const [committed, opened] = await Promise.all([
     publicClient.getLogs({ address: addr, event: { type: "event", name: "PackCommitted", inputs: [{ name: "player", type: "address", indexed: true }] }, args: { player: player as `0x${string}` }, fromBlock }),
-    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackOpened", inputs: [{ name: "player", type: "address", indexed: true }, { name: "card0", type: "uint8", indexed: false }, { name: "card1", type: "uint8", indexed: false }, { name: "card2", type: "uint8", indexed: false }] }, args: { player: player as `0x${string}` }, fromBlock }),
+    publicClient.getLogs({ address: addr, event: { type: "event", name: "PackOpened", inputs: [{ name: "player", type: "address", indexed: true }, { name: "card0", type: "uint8", indexed: false }, { name: "card1", type: "uint8", indexed: false }, { name: "card2", type: "uint8", indexed: false }, { name: "card3", type: "uint8", indexed: false }, { name: "card4", type: "uint8", indexed: false }] }, args: { player: player as `0x${string}` }, fromBlock }),
   ]);
   return committed.length > opened.length;
 }
@@ -175,7 +175,7 @@ export const cancelTrade = (tradeId: bigint) => sendTx("cancelTrade", [tradeId])
 // ─── Watchers ──────────────────────────────────────────────────
 
 export function watchPackOpened(
-  callback: (player: string, c0: number, c1: number, c2: number) => void
+  callback: (player: string, cards: number[]) => void
 ) {
   return publicClient.watchContractEvent({
     address: deployment.address as `0x${string}`,
@@ -183,8 +183,8 @@ export function watchPackOpened(
     eventName: "PackOpened",
     onLogs: (logs) => {
       for (const log of logs) {
-        const { player, card0, card1, card2 } = log.args as any;
-        callback(player, Number(card0), Number(card1), Number(card2));
+        const { player, card0, card1, card2, card3, card4 } = log.args as any;
+        callback(player, [card0, card1, card2, card3, card4].map(Number));
       }
     },
   });

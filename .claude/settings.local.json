@@ -1,20 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:paritytech.github.io)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:api.github.com)",
-      "Bash(curl *)",
-      "Bash(node -e ' *)",
-      "Bash(node --input-type=module)",
-      "Bash(python3 -m json.tool)",
-      "Bash(python3 -c ' *)",
-      "Bash(python3 -c \" import json, sys abi = json.load\\(sys.stdin\\)['abi'] for item in abi: if item.get\\('type'\\) == 'function' and item.get\\('name'\\) in ['packCommitBlock', 'commitPack', 'getGame', 'claimStarterPack']: print\\(item\\) \")",
-      "Bash(node *)",
-      "Bash(npx tsc *)",
-      "WebFetch(domain:docs.polkadot.com)",
-      "WebFetch(domain:www.dwellir.com)"
+      "Bash(mkslides build *)",
+      "Read(//tmp/**)",
+      "Bash(cat)",
+      "Bash(npm install *)",
+      "Bash(./node_modules/.bin/mmdc -i arch.mmd -o arch.svg -t dark -b transparent)",
+      "Bash(./node_modules/.bin/mmdc -i flow.mmd -o flow.svg -t dark -b transparent)",
+      "Bash(npm run *)",
+      "Bash(./node_modules/.bin/mmdc --help)",
+      "Bash(./node_modules/.bin/mmdc -t dark -i flow.mmd -o /tmp/flow-test.svg -b transparent)",
+      "Bash(rsvg-convert --help)",
+      "Bash(rsvg-convert -b '#191919' -o /tmp/arch.png /home/nico/code/pbp/cardGame/slides/diagrams/arch.svg)",
+      "Bash(rsvg-convert -b '#191919' -o /tmp/flow.png /home/nico/code/pbp/cardGame/slides/diagrams/flow.svg)",
+      "Bash(magick -background \"#191919\" /home/nico/code/pbp/cardGame/slides/diagrams/arch.svg /tmp/arch2.png)",
+      "Bash(magick -background \"#191919\" /home/nico/code/pbp/cardGame/slides/diagrams/flow.svg /tmp/flow2.png)",
+      "Bash(./node_modules/.bin/mmdc -c mermaid-config.json -i arch.mmd -o /tmp/arch-browser.png -b \"#191919\" -w 1600)",
+      "Bash(./node_modules/.bin/mmdc -c mermaid-config.json -i flow.mmd -o /tmp/flow-browser.png -b \"#191919\" -w 900)",
+      "Bash(./node_modules/.bin/mmdc -c mermaid-config.json -i arch.mmd -o /tmp/arch-browser.png -b \"#191919\" -w 1400)",
+      "Bash(python3 -m http.server 8765)"
     ]
   }
 }

@@ -1,0 +1,13 @@
+sequenceDiagram
+    actor P as Player
+    participant C as ChainCards
+
+    P->>C: commitDeckAndDeal(level, deck)
+    C-->>P: 5-card hand
+
+    loop every turn
+        P->>C: playAndDeal(cards)
+        C-->>P: resolved turn + new hand
+    end
+
+    C-->>P: GameEnded

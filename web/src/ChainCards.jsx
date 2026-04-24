@@ -102,7 +102,7 @@ function Card({ cardId, selected, onClick, small, played, count, dimmed }) {
   const w = small ? 90 : 118, h = small ? 132 : 172;
   return (
     <div onClick={onClick} style={{
-      width: w, minHeight: h,
+      width: w, minHeight: h, flexShrink: 0,
       background: `linear-gradient(160deg, ${c.color}ee 0%, ${c.color}99 60%, #0a0604 100%)`,
       border: selected ? "2px solid #c9a84c" : dimmed ? "2px solid #5a2a2a" : "2px solid #6b4c1e",
       borderRadius: 8,
@@ -138,7 +138,7 @@ function Card({ cardId, selected, onClick, small, played, count, dimmed }) {
         }}>{count}</div>
       )}
       <div style={{
-        fontSize: small ? 9.5 : 11, fontWeight: 600, color: "#e8d5b7",
+        fontSize: small ? 11 : 13, fontWeight: 600, color: "#e8d5b7",
         lineHeight: 1.2, letterSpacing: 0.3, textShadow: "0 1px 3px rgba(0,0,0,0.8)",
         fontFamily: "'Cinzel', serif",
       }}>{c.name}</div>
@@ -170,8 +170,8 @@ function Card({ cardId, selected, onClick, small, played, count, dimmed }) {
         ][cardId]}
       </div>
       <div style={{
-        fontSize: small ? 10 : 12, fontWeight: 600, textAlign: "center",
-        background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 4px",
+        fontSize: small ? 12 : 15, fontWeight: 700, textAlign: "center",
+        background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "3px 4px",
         color: [
           "#ff8a6b",  // attack
           "#8ab8ff",  // block
@@ -277,18 +277,19 @@ export default function ChainCardsGame() {
 
   // Deck builder
   const [selectedLevel, setSelectedLevel] = useState(null);
-  const [deck, setDeck] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("deck") ?? "[]"); } catch { return []; }
-  });
-
-  useEffect(() => {
-    if (account) localStorage.setItem(`deck:${account}`, JSON.stringify(deck));
-  }, [deck, account]);
+  const [deck, setDeck] = useState([]);
+  const deckLoadedFor = useRef(null);
 
   useEffect(() => {
     if (!account) return;
     try { setDeck(JSON.parse(localStorage.getItem(`deck:${account}`) ?? "[]")); } catch { setDeck([]); }
+    deckLoadedFor.current = account;
   }, [account]);
+
+  useEffect(() => {
+    if (!account || deckLoadedFor.current !== account) return;
+    localStorage.setItem(`deck:${account}`, JSON.stringify(deck));
+  }, [deck, account]);
 
   const [battle, setBattle] = useState(null);
   const [packState, setPackState] = useState("idle");
@@ -345,10 +346,10 @@ export default function ChainCardsGame() {
       const logs = parseReceiptLogs(receipt);
       const ev = logs.find((l) => l.eventName === "PackOpened");
       if (ev) {
-        const { card0, card1, card2 } = ev.args;
-        const results = [Number(card0), Number(card1), Number(card2)];
+        const { card0, card1, card2, card3, card4 } = ev.args;
+        const results = [Number(card0), Number(card1), Number(card2), Number(card3), Number(card4)];
         setPackResult(results);
-        addLog(`🎉 Got: ${CARD_DEFS[results[0]].name}, ${CARD_DEFS[results[1]].name}, ${CARD_DEFS[results[2]].name}`);
+        addLog(`🎉 Got: ${results.map((id) => CARD_DEFS[id].name).join(", ")}`);
         getCollection(account).then((c) => setCollection(c.map(Number)));
       }
       setPackState("idle");
@@ -362,15 +363,13 @@ export default function ChainCardsGame() {
   const toggleDeckCard = (cardId) => {
     const inDeck = deck.filter((d) => d === cardId).length;
     const owned = collection[cardId];
-    if (inDeck === 0 && deck.length < DECK_SIZE) {
-      setDeck([...deck, cardId]);
-    } else if (inDeck === owned) {
+    const full = deck.length >= DECK_SIZE;
+    if (inDeck === 0) {
+      if (!full) setDeck([...deck, cardId]);
+    } else if (inDeck === owned || full) {
       setDeck(deck.filter((d) => d !== cardId));
-    } else if (deck.length < DECK_SIZE) {
-      setDeck([...deck, cardId]);
     } else {
-      const idx = deck.lastIndexOf(cardId);
-      setDeck(deck.filter((_, i) => i !== idx));
+      setDeck([...deck, cardId]);
     }
   };
 
@@ -834,6 +833,11 @@ export default function ChainCardsGame() {
           <p style={{ fontSize: 14, color: G.parchDim, fontStyle: "italic", margin: "0 0 14px" }}>
             Click cards to add or remove. Exactly 15 required.
           </p>
+          {deck.length > 0 && (
+            <button onClick={() => setDeck([])} style={{ ...sty.btnDanger, marginBottom: 14 }}>
+              Clear selection
+            </button>
+          )}
 
           <div style={sty.grid}>
             {CARD_DEFS.map((c) => {
@@ -847,7 +851,7 @@ export default function ChainCardsGame() {
                       ⚠ traded
                     </div>
                   )}
-                  <Card cardId={c.id} small onClick={() => toggleDeckCard(c.id)}
+                  <Card cardId={c.id} onClick={() => toggleDeckCard(c.id)}
                     selected={inDeck > 0} count={collection[c.id]} dimmed={invalid} />
                   {inDeck > 0 && (
                     <div style={{
@@ -1048,7 +1052,7 @@ export default function ChainCardsGame() {
             <div style={{ fontSize: 17, fontWeight: 700, margin: "8px 0", fontFamily: "'Cinzel', serif", color: G.parchment, letterSpacing: 1 }}>
               Booster Pack
             </div>
-            <div style={{ color: G.parchDim, fontSize: 14, fontStyle: "italic" }}>3 random cards · 1 DOT</div>
+            <div style={{ color: G.parchDim, fontSize: 14, fontStyle: "italic" }}>5 random cards · 1 DOT</div>
 
             {packState === "idle" && !packResult && (
               <button onClick={handleCommitPack} style={{ ...sty.btn(false), marginTop: 18 }}>
@@ -1067,8 +1071,13 @@ export default function ChainCardsGame() {
             {packResult && (
               <div style={{ marginTop: 18 }}>
                 <div style={{ fontSize: 14, color: G.gold, marginBottom: 12, fontFamily: "'Cinzel', serif", letterSpacing: 1 }}>You received:</div>
-                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                  {packResult.map((cardId, i) => <Card key={i} cardId={cardId} small />)}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {packResult.slice(0, 3).map((cardId, i) => <Card key={i} cardId={cardId} small />)}
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {packResult.slice(3, 5).map((cardId, i) => <Card key={i + 3} cardId={cardId} small />)}
+                  </div>
                 </div>
                 <button onClick={() => setPackResult(null)} style={{ ...sty.btn(false), marginTop: 18 }}>
                   Buy Another

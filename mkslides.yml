@@ -1,0 +1,9 @@
+slides:
+  theme: black
+  highlight_theme: monokai
+
+revealjs:
+  history: true
+  slideNumber: "c/t"
+  hash: true
+  transition: slide
